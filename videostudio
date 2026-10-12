@@ -127,7 +127,7 @@ install_cmd() {
 }
 
 check() {
-  ensure_installed
+  # Desarrollo: basta el entorno de Python con las dependencias de desarrollo.
   VSA_DEV_DEPS=1 python_env
   local node_dir
   node_dir="$(cd "$BACKEND" && "$PY" -c 'from app.services.render_engine import find_node; n=find_node(); print(n.parent if n else "")')"
@@ -144,7 +144,7 @@ check() {
 }
 
 dev() {
-  ensure_installed
+  [[ -x "$PY" ]] || VSA_DEV_DEPS=1 python_env
   local port="${VSA_PORT:-8775}" token
   token="$(cd "$BACKEND" && "$PY" -c 'from app.config import get_settings; from app.session import ensure_token; print(ensure_token(get_settings().home))')"
   bold "Modo desarrollo — abre http://127.0.0.1:5173/open?t=$token (Ctrl+C para salir)"

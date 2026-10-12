@@ -150,7 +150,7 @@ function Invoke-Launcher($cmd) {
 }
 
 function Invoke-Check {
-  if (-not (Test-Installed)) { Invoke-Install }
+  # Desarrollo: basta el entorno de Python con las dependencias de desarrollo.
   Initialize-Python $true
   Push-Location $Backend
   try {

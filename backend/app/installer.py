@@ -424,9 +424,11 @@ def step_model(enabled: bool, model_id: str | None) -> str:
     if asr_models.is_installed(chosen):
         ok(f"Modelo «{spec.name}» ya instalado")
         return chosen
+    label = "Modelo elegido" if model_id else "Modelo recomendado"
+    size = f"{spec.size_bytes / 1e9:.1f}".replace(".", ",")
     print(
-        f"    Modelo recomendado: {spec.name} ({spec.size_bytes / 1e9:.1f} GB, "
-        f"{spec.repo}@{spec.revision[:10]}).\n    {spec.description}",
+        f"    {label}: {spec.name} ({size} GB, {spec.repo}@{spec.revision[:10]}).\n"
+        f"    {spec.description}",
         flush=True,
     )
     if not enabled or not confirm(f"¿Descargar «{spec.name}» ahora?"):
