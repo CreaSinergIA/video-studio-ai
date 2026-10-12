@@ -38,7 +38,8 @@ def _nvidia() -> str | None:
     try:
         out = subprocess.run(
             [exe, "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5, check=True,
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=5, check=True,
         ).stdout.strip()  # fmt: skip
     except (subprocess.SubprocessError, OSError):
         return None
@@ -53,8 +54,9 @@ def detect() -> PlatformInfo:
     notes: list[str] = []
     if os_ == "windows":
         notes.append(
-            "Windows: interfaz y exportación previstas; transcripción local y algunas "
-            "integraciones del sistema pendientes de adaptación (no validado)."
+            "Windows: adaptaciones implementadas (faster-whisper, Administrador de credenciales, "
+            "lanzador, navegador de render win64); la validación en un equipo Windows real está "
+            "pendiente."
         )
     return PlatformInfo(
         os=os_,

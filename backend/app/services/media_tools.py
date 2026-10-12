@@ -17,6 +17,7 @@ import secrets
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from app import limits
+from app.platform import processes
 from app.services.storage import atomic_write_json
 
 log = logging.getLogger(__name__)
@@ -48,6 +51,64 @@ def _finalize(tmp: Path, dest: Path) -> None:
     os.replace(tmp, dest)
 
 
+class Watchdog:
+    """Vigila un proceso de FFmpeg: cancelación inmediata, bloqueo (sin avance durante
+    ``stall`` segundos) y tiempo máximo absoluto. Termina el árbol completo del proceso."""
+
+    def __init__(
+        self,
+        proc: subprocess.Popen[Any],
+        *,
+        cancel: threading.Event | None,
+        max_seconds: float,
+        stall_seconds: float,
+    ) -> None:
+        self.proc = proc
+        self.cancel = cancel
+        self.max_seconds = max_seconds
+        self.stall_seconds = stall_seconds
+        self.reason: str | None = None
+        self._started = time.monotonic()
+        self._last = self._started
+        self._done = threading.Event()
+        threading.Thread(target=self._loop, name="ffmpeg-watchdog", daemon=True).start()
+
+    def tick(self) -> None:
+        """Hubo avance real (tiempo de salida, bytes escritos o fotogramas leídos)."""
+        self._last = time.monotonic()
+
+    def stop(self) -> None:
+        self._done.set()
+
+    def _loop(self) -> None:
+        while not self._done.wait(0.25):
+            if self.proc.poll() is not None:
+                return
+            now = time.monotonic()
+            if self.cancel is not None and self.cancel.is_set():
+                self.reason = "cancelled"
+            elif now - self._started > self.max_seconds:
+                self.reason = "timeout"
+            elif now - self._last > self.stall_seconds:
+                self.reason = "stalled"
+            else:
+                continue
+            processes.terminate_tree(self.proc, grace=3)
+            return
+
+    def raise_if_stopped(self) -> None:
+        if self.reason == "cancelled":
+            raise Cancelled()
+        if self.reason == "timeout":
+            raise FFmpegError(
+                f"FFmpeg superó el tiempo máximo ({int(self.max_seconds)} s) y se detuvo."
+            )
+        if self.reason == "stalled":
+            raise FFmpegError(
+                f"FFmpeg dejó de avanzar durante {int(self.stall_seconds)} s y se detuvo."
+            )
+
+
 def run_ffmpeg(
     ffmpeg: str,
     args: list[str],
@@ -55,8 +116,12 @@ def run_ffmpeg(
     duration: float | None = None,
     on_progress: ProgressFn | None = None,
     cancel: threading.Event | None = None,
+    max_seconds: float | None = None,
 ) -> None:
-    """Ejecuta FFmpeg leyendo ``-progress`` para informar avance real y permitir cancelar."""
+    """Ejecuta FFmpeg leyendo ``-progress`` para informar avance real y permitir cancelar.
+
+    Un vigilante lo detiene si deja de avanzar (``limits.FFMPEG_STALL_SECONDS``) o supera el
+    tiempo máximo (``limits.ffmpeg_max_seconds``)."""
     cmd = [
         ffmpeg,
         "-hide_banner",
@@ -71,9 +136,26 @@ def run_ffmpeg(
     ]
     log.debug("ffmpeg %s", " ".join(cmd))
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            **processes.group_kwargs(),
+        )
     except FileNotFoundError as exc:
-        raise FFmpegError("No se encontró FFmpeg. Instálalo con «brew install ffmpeg».") from exc
+        raise FFmpegError(
+            "No se encontró FFmpeg. Ejecuta el instalador de Video Studio AI de nuevo."
+        ) from exc
+    processes.track(proc)
+    watchdog = Watchdog(
+        proc,
+        cancel=cancel,
+        max_seconds=max_seconds or limits.ffmpeg_max_seconds(duration),
+        stall_seconds=limits.FFMPEG_STALL_SECONDS,
+    )
     stderr_tail: collections.deque[str] = collections.deque(maxlen=20)
 
     def _drain_stderr() -> None:
@@ -84,23 +166,29 @@ def run_ffmpeg(
     drain = threading.Thread(target=_drain_stderr, daemon=True)
     drain.start()
     assert proc.stdout is not None
+    last_mark = ""
     try:
         for line in proc.stdout:
-            if cancel is not None and cancel.is_set():
-                proc.terminate()
-                break
+            if line.startswith(("out_time_us=", "total_size=", "frame=")):
+                mark = line.strip()
+                if mark != last_mark and not mark.endswith(("=0", "=N/A")):
+                    watchdog.tick()
+                last_mark = mark
             if on_progress and duration and line.startswith("out_time_us="):
                 with contextlib.suppress(ValueError):
                     seconds = int(line.split("=", 1)[1]) / 1_000_000
                     on_progress(max(0.0, min(1.0, seconds / duration)))
         proc.wait()
     finally:
+        watchdog.stop()
         if proc.poll() is None:
-            proc.kill()
+            processes.terminate_tree(proc, grace=2)
             proc.wait()
+        processes.untrack(proc)
         drain.join(timeout=2)
     if cancel is not None and cancel.is_set():
         raise Cancelled()
+    watchdog.raise_if_stopped()
     if proc.returncode != 0:
         detail = stderr_tail[-1] if stderr_tail else f"código {proc.returncode}"
         raise FFmpegError(f"FFmpeg falló: {detail}")
@@ -115,7 +203,12 @@ def run_ffmpeg(
 def available_encoders(ffmpeg: str) -> frozenset[str]:
     try:
         out = subprocess.run(
-            [ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=15
+            [ffmpeg, "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
         ).stdout
     except (OSError, subprocess.TimeoutExpired):
         return frozenset()
@@ -130,7 +223,14 @@ def available_encoders(ffmpeg: str) -> frozenset[str]:
 @lru_cache(maxsize=4)
 def binary_version(binary: str) -> str | None:
     try:
-        out = subprocess.run([binary, "-version"], capture_output=True, text=True, timeout=10)
+        out = subprocess.run(
+            [binary, "-version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     first = out.stdout.splitlines()[0] if out.stdout else ""

@@ -31,6 +31,7 @@ export const keys = {
   budget: ['claude-budget'] as const,
   claudeUsage: ['claude-usage'] as const,
   backups: ['backups'] as const,
+  setup: ['setup-status'] as const,
 }
 
 const isActive = (job: Job) => job.status === 'queued' || job.status === 'running'
@@ -263,4 +264,10 @@ export function useClaudeUsage() {
 
 export function useBackups() {
   return useQuery({ queryKey: keys.backups, queryFn: api.backups })
+}
+
+// --- Community Edition: primera configuración ------------------------------
+
+export function useSetupStatus() {
+  return useQuery({ queryKey: keys.setup, queryFn: api.setupStatus, staleTime: 5_000 })
 }

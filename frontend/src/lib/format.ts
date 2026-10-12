@@ -118,3 +118,7 @@ export const STYLE_META: Record<StyleId, { name: string; color: string; textClas
   minimal_motion: { name: 'Minimal Motion', color: '#e8e1d6', textClass: 'text-minimal' },
   creative_explainer: { name: 'Creative Explainer', color: '#ff7a59', textClass: 'text-creative' },
 }
+
+/** Gestor de archivos del sistema del usuario, para los textos del panel. */
+export const IS_WINDOWS = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent)
+export const FILE_MANAGER = IS_WINDOWS ? 'el Explorador' : 'Finder'

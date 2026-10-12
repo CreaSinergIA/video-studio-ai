@@ -101,7 +101,9 @@ def test_platform_diagnosis_is_reported(client: TestClient) -> None:
     p = info["platform"]
     assert p["os"] in ("macos", "windows", "linux")
     ids = {e["id"]: e for e in p["transcription_engines"]}
-    assert ids["faster-whisper"]["implemented"] is False  # pendiente (Windows)
+    # CE Fase 2: faster-whisper implementado (Windows/Linux/Mac Intel); whisper.cpp descartado.
+    assert ids["faster-whisper"]["implemented"] is True
+    assert "whisper.cpp" not in ids
     assert info["app"]["edition"] == "Community Edition"
     assert info["app"]["creator"] == "Created by Gabo"
 

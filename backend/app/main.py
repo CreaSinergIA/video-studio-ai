@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.staticfiles import StaticFiles
 
-from app import db
+from app import db, lifecycle, session
 from app.api import (
     analysis,
     animations,
@@ -38,6 +39,7 @@ from app.jobs import (  # noqa: F401  (registra los tipos de tarea)
 )
 from app.jobs.runner import runner
 from app.logging_setup import configure_logging
+from app.platform import processes
 from app.services import data_safety, exporter
 from app.services import presets as preset_service
 from app.services.storage import cleanup_stale_uploads, cleanup_trash
@@ -54,6 +56,8 @@ def _startup(settings: Settings) -> str:
     log_file = configure_logging(settings.logs_dir)
     kind = data_safety.ensure_environment(settings.home, APP_VERSION)
     log.info("%s %s — datos en %s (entorno %s)", APP_NAME, APP_VERSION, settings.home, kind)
+    # Hijos que sobrevivieron a un cierre abrupto anterior (render, transcripción, FFmpeg).
+    processes.reap_orphans(lifecycle.run_dir(settings.home))
     db.init_engine(settings.database_url)
     existed = settings.db_path.is_file() and settings.db_path.stat().st_size > 0
     if existed:
@@ -85,6 +89,7 @@ def _startup(settings: Settings) -> str:
             log.warning("Almacenamiento no disponible al arrancar: %s", status.message)
     runner.max_workers = settings.max_concurrent_jobs
     runner.start()
+    lifecycle.write_instance(settings.home, settings.port, APP_VERSION)
     return str(log_file)
 
 
@@ -98,16 +103,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             runner.stop()
+            lifecycle.clear_instance(settings.home)
             log.info("Servidor detenido")
 
+    # La documentación interactiva carga recursos de un CDN: solo si se pide expresamente.
+    docs = os.environ.get("VSA_API_DOCS") == "1"
     app = FastAPI(
         title=f"{APP_NAME} API",
         version=APP_VERSION,
         lifespan=lifespan,
-        docs_url="/api/docs",
-        openapi_url="/api/openapi.json",
+        docs_url="/api/docs" if docs else None,
+        openapi_url="/api/openapi.json" if docs else None,
         redoc_url=None,
     )
+    token = session.ensure_token(settings.home)
+    app.state.session_token = token
 
     # Anti DNS-rebinding: solo se aceptan peticiones dirigidas a localhost.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
@@ -132,6 +142,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 {"code": "forbidden", "message": "Petición no autorizada.", "details": None},
                 status_code=403,
             )
+        return await call_next(request)
+
+    @app.middleware("http")
+    async def require_session(request: Request, call_next):
+        """Token de sesión (ver app/session.py): otros programas o cuentas del equipo no
+        pueden usar la API local aunque alcancen 127.0.0.1."""
+        path = request.url.path
+        if path.startswith("/api/") and path not in session.PUBLIC_API:
+            candidate = request.cookies.get(session.COOKIE) or request.headers.get(session.HEADER)
+            if not session.matches(candidate, token):
+                return JSONResponse(
+                    {
+                        "code": "session_required",
+                        "message": "Abre Video Studio AI desde su lanzador para iniciar sesión "
+                        "en el panel.",
+                        "details": None,
+                    },
+                    status_code=401,
+                )
         return await call_next(request)
 
     @app.middleware("http")
@@ -167,6 +196,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             {"code": "not_found", "message": f"Ruta /api/{rest} inexistente.", "details": None},
             status_code=404,
         )
+
+    @app.get("/open", include_in_schema=False)
+    async def open_panel(t: str = ""):
+        """Entrada desde el lanzador: cambia el token por una cookie HttpOnly y limpia la URL."""
+        if not session.matches(t, token):
+            return RedirectResponse("/?session=invalid", status_code=303)
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(
+            session.COOKIE,
+            token,
+            max_age=session.COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="strict",
+            path="/",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     _mount_frontend(app, settings.frontend_dist)
     return app

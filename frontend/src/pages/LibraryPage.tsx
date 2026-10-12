@@ -11,6 +11,7 @@ import { Menu } from '@/components/ui/Menu'
 import { useImporter } from '@/hooks/importer-context'
 import { useProjects, useSaveGeneral, useSettings, useStorageStatus, useSystemInfo } from '@/hooks/queries'
 import type { GeneralPreferences, ProjectSummary } from '@/lib/types'
+import { FILE_MANAGER } from '@/lib/format'
 
 function Welcome() {
   return (
@@ -115,7 +116,7 @@ export function LibraryPage() {
       {system?.native_dialogs && (
         <Menu
           items={[
-            { label: 'Elegir en Finder (recomendado)', icon: <Upload />, onSelect: () => void importer.pickAndImport() },
+            { label: `Elegir en ${FILE_MANAGER} (recomendado)`, icon: <Upload />, onSelect: () => void importer.pickAndImport() },
             { label: 'Subir desde el navegador', icon: <MonitorUp />, onSelect: () => importer.pickWithBrowser() },
           ]}
           trigger={

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app import db
+from app import db, edition, lifecycle
 from app.config import APP_VERSION, get_settings
 from app.db import get_session
 from app.domain.preferences import GeneralPreferences
@@ -23,12 +23,56 @@ router = APIRouter(tags=["sistema"])
 
 @router.get("/health")
 def health():
+    # Público (sin token): solo lo necesario para que el lanzador reconozca su instancia.
     return {
         "ok": True,
+        "app": "video-studio-ai",
+        "edition": edition.EDITION,
+        "instance": lifecycle.instance_id(get_settings().home),
         "version": APP_VERSION,
         "environment": data_safety.STATE.get("environment", "user"),
         "db_integrity": data_safety.STATE.get("db_integrity", "ok"),
     }
+
+
+@router.get("/setup/status")
+def setup_status(session: Session = Depends(get_session)):
+    """Primera configuración: comprobaciones del equipo (sin modificar nada) y progreso."""
+    from app.services import setup_checks
+    from app.services.storage_manager import storage_manager
+
+    storage = storage_manager.active_status(session)
+    state = app_settings.get_setup(session)
+    return {
+        **setup_checks.summary(),
+        "storage_configured": bool(storage.configured and storage.available),
+        "completed_at": state.get("completed_at"),
+        "data_dir": str(get_settings().home),
+    }
+
+
+class SetupDone(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    completed: bool = True
+
+
+@router.post("/setup/complete")
+def setup_complete(body: SetupDone, session: Session = Depends(get_session)):
+    """Cierra (o vuelve a abrir) la primera configuración. Todo puede completarse después
+    desde Ajustes."""
+    from app.models import utcnow
+
+    value = {"completed_at": utcnow().isoformat()} if body.completed else {}
+    app_settings.save_setup(session, value)
+    session.commit()
+    return value
+
+
+@router.post("/system/shutdown", status_code=202)
+def shutdown():
+    """Cierre ordenado pedido por el lanzador (o desde el panel): la cola de tareas cancela sus
+    procesos y el servidor sale sin dejar huérfanos."""
+    return {"stopping": lifecycle.request_shutdown()}
 
 
 def _backup_out(b: data_safety.Backup) -> dict[str, Any]:

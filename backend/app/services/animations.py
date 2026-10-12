@@ -551,7 +551,7 @@ def valid_clip(path: Path, spec: dict[str, Any]) -> bool:
             out = subprocess.run(
                 [get_settings().ffprobe, "-v", "error", "-select_streams", "v:0", "-count_packets",
                  "-show_entries", "stream=width,height,nb_read_packets", "-of", "json", str(path)],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
             ).stdout  # fmt: skip
             s0 = (json.loads(out or "{}").get("streams") or [{}])[0]
             frames = int(s0.get("nb_read_packets") or 0)
@@ -743,7 +743,7 @@ def voice_measure(path: Path) -> tuple[float | None, float | None]:
             err = subprocess.run(
                 [get_settings().ffmpeg, "-nostdin", "-i", str(path), "-vn", "-map", "0:a:0",
                  "-af", "ebur128=peak=true", "-f", "null", "-"],
-                capture_output=True, text=True, timeout=300,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
             ).stderr  # fmt: skip
             tail = err[err.rfind("Summary:") :]
             value = float(tail.split("I:")[1].split()[0])

@@ -47,12 +47,13 @@ export function EngineSection() {
             <Row label="Navegador de render" ok={st.browser.installed}>
               {st.browser.installed ? (
                 <span>
-                  {st.browser.name} {st.browser.version} · firma {st.browser.codesign}
+                  {st.browser.name} {st.browser.version}
+                  {st.browser.codesign ? ` · firma ${st.browser.codesign}` : ' · verificado por SHA-256'}
                   <span className="mt-0.5 block font-mono text-[11px] text-fg-muted">SHA-256 {st.browser.sha256?.slice(0, 24)}… · instalado {formatRelative(st.browser.installed_at)}</span>
                 </span>
               ) : (
                 <span>
-                  No instalado. Descarga oficial de Google («Chrome for Testing», {formatBytes(st.browser.download_bytes)}), verificada con la huella publicada y la firma de código.
+                  No instalado. Descarga oficial de Google («Chrome for Testing», {formatBytes(st.browser.download_bytes)}), verificada con las huellas publicadas (y, en macOS, la firma de código).
                 </span>
               )}
             </Row>

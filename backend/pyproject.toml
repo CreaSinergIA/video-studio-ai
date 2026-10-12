@@ -16,6 +16,22 @@ dependencies = [
     "pillow>=11",
     "huggingface-hub>=0.30",
     "anthropic>=0.70",
+    # Fase CE-2 — instalación multiplataforma
+    # Transcripción en Windows/Linux/Mac Intel (CPU INT8; CUDA opcional). En Apple Silicon queda
+    # como alternativa a MLX (y permite validar el motor de Windows en un Mac).
+    "faster-whisper>=1.2,<2",
+    # Gestión de procesos e instancias portable (macOS/Windows/Linux).
+    "psutil>=7",
+    # Llavero del sistema en Windows (Administrador de credenciales) y Linux (Secret Service).
+    "keyring>=25; sys_platform != 'darwin'",
+]
+
+[project.optional-dependencies]
+# Opcional (Windows/Linux con GPU NVIDIA): bibliotecas CUDA 12 y cuDNN 9 para que faster-whisper
+# use la GPU. Sin ellas (o si fallan al cargar) transcribe en la CPU. `videostudio install --cuda`.
+cuda = [
+    "nvidia-cublas-cu12>=12.4,<13; sys_platform != 'darwin'",
+    "nvidia-cudnn-cu12>=9.1,<10; sys_platform != 'darwin'",
 ]
 
 [dependency-groups]
@@ -24,6 +40,8 @@ dev = [
     "httpx2>=2.13",
     "ruff>=0.14",
     "mypy>=1.18",
+    # Pruebas del almacén de credenciales de Windows/Linux también en macOS.
+    "keyring>=25",
 ]
 
 [tool.uv]
@@ -68,5 +86,7 @@ ignore_missing_imports = true
 "app/styles/*.py" = ["E501"]  # descripciones de plantillas para Claude
 "tests/test_phase5.py" = ["E501", "F811"]
 "tests/test_phase5_matrix.py" = ["E501", "F811"]
+"tests/test_ce_phase2.py" = ["E501", "F811"]
+"tests/fake_anthropic.py" = ["E501"]
 "app/services/compositor.py" = ["E501"]
 "app/services/layout_engine.py" = ["E501"]

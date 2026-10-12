@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-const backend = process.env.VSA_BACKEND_URL ?? 'http://127.0.0.1:8765'
+const backend = process.env.VSA_BACKEND_URL ?? 'http://127.0.0.1:8775'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -15,7 +15,8 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    proxy: { '/api': { target: backend, changeOrigin: false } },
+    // /open cambia el token de sesión por la cookie (ver backend/app/session.py).
+    proxy: { '/api': { target: backend, changeOrigin: false }, '/open': { target: backend, changeOrigin: false } },
   },
   build: {
     target: 'es2023',

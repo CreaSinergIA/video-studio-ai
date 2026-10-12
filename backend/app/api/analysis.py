@@ -20,6 +20,7 @@ from app.domain.edit_config import EditConfig, ExportSettings
 from app.domain.preferences import AnalysisPreferences
 from app.jobs.runner import ACTIVE_STATUSES, create_job, runner
 from app.models import AnalysisFrame, Export, Job, MediaAsset, Project, Transcript, new_id
+from app.platform import transcription as transcription_engines
 from app.services import analysis_bundle, app_settings, asr_models, exporter, native, subtitles
 from app.services import projects as project_service
 from app.services import transcripts as transcript_service
@@ -97,9 +98,11 @@ def analyze(project_id: str, body: AnalyzeRequest, session: Session = Depends(ge
             if not asr_models.platform_supported():
                 raise StorageError(
                     "asr_unsupported",
-                    "La transcripción local con MLX requiere un Mac con Apple Silicon.",
+                    "No hay ningún motor de transcripción local disponible en este equipo. "
+                    "Ejecuta el instalador de nuevo.",
                     501,
                 )
+            asr_models.require_usable(model_id)
             asr_models.installed_path(model_id)
         existing = _active_job(session, asset.id, "transcribe")
         payload: dict[str, Any] = {"transcription_model": model_id}
@@ -601,15 +604,18 @@ def list_models(session: Session = Depends(get_session)):
     }
     return {
         "supported": asr_models.platform_supported(),
+        "engines": [e.as_dict() for e in transcription_engines.engines()],
+        "default_model": asr_models.default_model_id(),
         "models": [
-            {**asr_models.describe(mid), "job": downloading.get(mid)} for mid in asr_models.CATALOG
+            {**asr_models.describe(mid), "job": downloading.get(mid)}
+            for mid in asr_models.available_ids()
         ],
     }
 
 
 @router.post("/asr/models/{model_id}/download", status_code=202)
 def download_model(model_id: str, session: Session = Depends(get_session)):
-    asr_models.get_spec(model_id)
+    asr_models.require_usable(model_id)
     existing = session.scalar(
         select(Job).where(Job.kind == "download_model", Job.status.in_(ACTIVE_STATUSES))
     )
@@ -643,6 +649,7 @@ def get_analysis_settings(session: Session = Depends(get_session)):
 
 @router.put("/settings/analysis", response_model=AnalysisPreferences)
 def put_analysis_settings(body: AnalysisPreferences, session: Session = Depends(get_session)):
+    asr_models.require_usable(body.transcription_model)
     app_settings.save_analysis(session, body)
     session.commit()
     return body

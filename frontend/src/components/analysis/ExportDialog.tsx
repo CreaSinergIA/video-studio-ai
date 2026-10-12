@@ -8,7 +8,7 @@ import { Badge, ProgressBar, Spinner } from '@/components/ui/feedback'
 import { Field, Segmented, Select, Switch } from '@/components/ui/fields'
 import { keys, useExports, useAnimations } from '@/hooks/queries'
 import { ApiError, api } from '@/lib/api'
-import { formatBytes, formatDateTime, formatDuration } from '@/lib/format'
+import { formatBytes, formatDateTime, formatDuration, IS_WINDOWS } from '@/lib/format'
 import type { Asset, ExportItem, ExportSettings } from '@/lib/types'
 
 const errText = (e: unknown) => (e instanceof ApiError ? e.message : String(e))
@@ -75,7 +75,7 @@ function ExportRow({ item, onPreview }: { item: ExportItem; onPreview: (e: Expor
               Abrir
             </Button>
             <Button size="sm" variant="ghost" icon={<FolderSearch className="size-3.5" />} onClick={() => act(() => api.revealExport(item.id))}>
-              Finder
+              {IS_WINDOWS ? 'Explorador' : 'Finder'}
             </Button>
             <a
               href={`${item.url}?download=true`}

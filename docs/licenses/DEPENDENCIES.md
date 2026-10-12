@@ -1,6 +1,6 @@
 # Inventario de dependencias (generado)
 
-Generado el 2026-10-12 a partir de los archivos de bloqueo (`uv.lock`, `package-lock.json`) con `pip-licenses` y `license-checker-rseidelsohn`. Incluye dependencias directas y transitivas, también las de desarrollo. Revisa `THIRD_PARTY_NOTICES.md` para las obligaciones.
+Generado el 2026-10-12 (Python actualizado en la CE Fase 2) a partir de los archivos de bloqueo (`uv.lock`, `package-lock.json`) con `pip-licenses` y `license-checker-rseidelsohn`. Incluye dependencias directas y transitivas, también las de desarrollo. Revisa `THIRD_PARTY_NOTICES.md` para las obligaciones.
 
 | Ecosistema | Paquete | Versión | Licencia | Fuente |
 |---|---|---|---|---|
@@ -10,12 +10,16 @@ Generado el 2026-10-12 a partir de los archivos de bloqueo (`uv.lock`, `package-
 | Python (backend) | anthropic | 1.12.1 | MIT License | https://github.com/anthropics/anthropic-sdk-python |
 | Python (backend) | anyio | 4.15.1 | MIT | https://anyio.readthedocs.io/en/stable/versionhistory.html |
 | Python (backend) | ast_serialize | 0.12.1 | MIT | https://github.com/mypyc/ast_serialize |
+| Python (backend) | av | 19.0.1 | BSD-3-Clause | https://pyav.basswood.io |
 | Python (backend) | certifi | 2026.7.22 | Mozilla Public License 2.0 (MPL 2.0) | https://github.com/certifi/python-certifi |
 | Python (backend) | charset-normalizer | 3.5.2 | MIT | https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md |
 | Python (backend) | click | 8.5.0 | BSD-3-Clause | https://github.com/pallets/click/ |
+| Python (backend) | ctranslate2 | 4.8.2 | MIT | https://opennmt.net |
 | Python (backend) | docstring_parser | 0.18.0 | MIT License | https://github.com/rr-/docstring_parser |
 | Python (backend) | fastapi | 0.143.0 | MIT | https://github.com/fastapi/fastapi |
+| Python (backend) | faster-whisper | 1.2.1 | MIT License | https://github.com/SYSTRAN/faster-whisper |
 | Python (backend) | filelock | 4.0.12 | MIT | https://github.com/tox-dev/py-filelock |
+| Python (backend) | flatbuffers | 25.12.19 | Apache Software License | https://google.github.io/flatbuffers/ |
 | Python (backend) | fsspec | 2026.9.0 | BSD-3-Clause | https://github.com/fsspec/filesystem_spec |
 | Python (backend) | h11 | 0.16.0 | MIT License | https://github.com/python-hyper/h11 |
 | Python (backend) | hf-xet | 1.7.0 | Apache-2.0 | https://github.com/huggingface/xet-core |
@@ -24,7 +28,11 @@ Generado el 2026-10-12 a partir de los archivos de bloqueo (`uv.lock`, `package-
 | Python (backend) | huggingface_hub | 2.2.0 | Apache Software License | https://github.com/huggingface/huggingface_hub |
 | Python (backend) | idna | 3.20 | BSD-3-Clause | https://github.com/kjd/idna |
 | Python (backend) | iniconfig | 2.3.1 | MIT | https://github.com/pytest-dev/iniconfig |
+| Python (backend) | jaraco.classes | 3.4.0 | MIT License | https://github.com/jaraco/jaraco.classes |
+| Python (backend) | jaraco.context | 6.1.2 | MIT | https://github.com/jaraco/jaraco.context |
+| Python (backend) | jaraco.functools | 4.6.0 | MIT | https://github.com/jaraco/jaraco.functools |
 | Python (backend) | jiter | 0.17.0 | MIT | https://github.com/pydantic/jiter/ |
+| Python (backend) | keyring | 25.7.0 | MIT | https://github.com/jaraco/keyring |
 | Python (backend) | librt | 0.16.0 | MIT | https://github.com/mypyc/librt |
 | Python (backend) | llvmlite | 0.50.0 | BSD-2-Clause AND Apache-2.0 WITH LLVM-exception | http://llvmlite.readthedocs.io |
 | Python (backend) | Mako | 1.4.3 | MIT | https://www.makotemplates.org/ |
@@ -37,12 +45,15 @@ Generado el 2026-10-12 a partir de los archivos de bloqueo (`uv.lock`, `package-
 | Python (backend) | mypy_extensions | 1.1.0 | MIT | https://github.com/python/mypy_extensions |
 | Python (backend) | numba | 0.68.0 | BSD License | https://numba.pydata.org |
 | Python (backend) | numpy | 2.5.3 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | https://numpy.org |
+| Python (backend) | onnxruntime | 1.31.0 | MIT License | https://onnxruntime.ai |
 | Python (backend) | opencv-python-headless | 5.0.0.93 | Apache Software License | https://github.com/opencv/opencv-python |
 | Python (backend) | opentelemetry-api | 1.45.1 | Apache-2.0 | https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api |
 | Python (backend) | packaging | 26.3 | Apache-2.0 OR BSD-2-Clause | https://github.com/pypa/packaging |
 | Python (backend) | pathspec | 1.1.1 | Mozilla Public License 2.0 (MPL 2.0) | https://python-path-specification.readthedocs.io/en/latest/index.html |
 | Python (backend) | pillow | 12.3.0 | MIT-CMU | https://python-pillow.github.io |
 | Python (backend) | pluggy | 1.6.0 | MIT License | UNKNOWN |
+| Python (backend) | protobuf | 7.36.2 | 3-Clause BSD License | https://developers.google.com/protocol-buffers/ |
+| Python (backend) | psutil | 7.2.2 | BSD-3-Clause | https://github.com/giampaolo/psutil |
 | Python (backend) | pydantic | 2.14.0 | MIT | https://github.com/pydantic/pydantic |
 | Python (backend) | pydantic_core | 2.50.0 | MIT | https://github.com/pydantic |
 | Python (backend) | Pygments | 2.21.0 | BSD-2-Clause | https://pygments.org |
@@ -55,7 +66,29 @@ Generado el 2026-10-12 a partir de los archivos de bloqueo (`uv.lock`, `package-
 | Python (backend) | sniffio | 1.3.1 | Apache Software License; MIT License | https://github.com/python-trio/sniffio |
 | Python (backend) | SQLAlchemy | 2.1.4 | MIT | https://www.sqlalchemy.org |
 | Python (backend) | starlette | 1.7.0 | BSD-3-Clause | https://github.com/Kludex/starlette |
-| Python (backend) | tiktoken | 0.14.0 | MIT | https://github.com/openai/tiktoken |
+| Python (backend) | tiktoken | 0.14.0 | MIT License
+
+Copyright (c) 2022 OpenAI, Shantanu Jain
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+ | https://github.com/openai/tiktoken |
+| Python (backend) | tokenizers | 0.23.3 | Apache Software License | https://github.com/huggingface/tokenizers |
 | Python (backend) | tqdm | 4.70.1 | MPL-2.0 AND MIT | https://tqdm.github.io |
 | Python (backend) | truststore | 0.10.4 | MIT | https://github.com/sethmlarson/truststore |
 | Python (backend) | typing-inspection | 0.4.4 | MIT | https://github.com/pydantic/typing-inspection |

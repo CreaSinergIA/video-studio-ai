@@ -621,9 +621,26 @@ export interface ExportItem {
   url: string | null
 }
 
+export interface AsrEngine {
+  id: 'mlx-whisper' | 'faster-whisper'
+  name: string
+  implemented: boolean
+  available: boolean
+  reason: string
+}
+
+export interface AsrModelsResponse {
+  supported: boolean
+  engines: AsrEngine[]
+  default_model: string
+  models: AsrModel[]
+}
+
 export interface AsrModel {
   id: string
   name: string
+  engine: AsrEngine['id']
+  license: string | null
   description: string
   repo: string
   revision: string
@@ -637,7 +654,7 @@ export interface AsrModel {
 }
 
 export interface AnalysisPreferences {
-  transcription_model: 'large-v3-turbo' | 'large-v3-turbo-q4'
+  transcription_model: 'large-v3-turbo' | 'large-v3-turbo-q4' | 'fw-large-v3-turbo' | 'fw-small'
   language: 'auto' | 'es' | 'en' | 'pt' | 'fr' | 'it' | 'de' | 'ca'
   scene_threshold: number
   min_scene_seconds: number
@@ -791,6 +808,37 @@ export interface ClaudeStatus {
   ready: boolean
   verified: boolean
   billing: 'subscription' | 'api'
+  key_store?: string
+  pricing?: {
+    usd_per_mtok: { input: number; output: number; cache_write: number; cache_read: number } | null
+    as_of: string
+  }
+}
+
+export interface ClaudeKeyCheck {
+  ok: boolean
+  code?: string
+  error?: string
+  model?: string
+  display_name?: string | null
+  duration_ms?: number
+}
+
+export interface SetupCheck {
+  id: 'platform' | 'resources' | 'ffmpeg' | 'node' | 'panel' | 'remotion' | 'transcription' | 'claude'
+  label: string
+  status: 'ok' | 'warning' | 'error' | 'missing'
+  detail: string
+  fix: string
+  data: Record<string, unknown>
+}
+
+export interface SetupStatus {
+  checks: SetupCheck[]
+  ready: boolean
+  storage_configured: boolean
+  completed_at: string | null
+  data_dir: string
 }
 
 export type InterventionType =

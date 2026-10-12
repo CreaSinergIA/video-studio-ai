@@ -21,7 +21,9 @@ import type {
   AnalysisFrame,
   AnalysisPreferences,
   AnalysisState,
-  AsrModel,
+  AsrModelsResponse,
+  ClaudeKeyCheck,
+  SetupStatus,
   ExportItem,
   ExportPlan,
   ExportSettings,
@@ -44,6 +46,9 @@ import type {
   Waveform,
   Duplicate,
 } from './types'
+
+/** Evento global cuando la API pide el token de sesión (ver backend/app/session.py). */
+export const SESSION_EVENT = 'vsa:session-required'
 
 /** Cabecera exigida por el backend en peticiones que modifican datos (protección CSRF). */
 export const CLIENT_HEADER = { 'X-VSA-Client': '1' } as const
@@ -99,7 +104,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       'No hay conexión con el servidor local. ¿Sigue en ejecución Video Studio AI?',
     )
   }
-  if (!res.ok) throw await toApiError(res)
+  if (!res.ok) {
+    const error = await toApiError(res)
+    // Sin cookie de sesión (abierto sin el lanzador o token renovado): aviso global.
+    if (error.status === 401 && error.code === 'session_required') window.dispatchEvent(new Event(SESSION_EVENT))
+    throw error
+  }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
@@ -210,7 +220,7 @@ export const api = {
   revealExport: (id: string) => post<{ ok: boolean }>(`/api/exports/${id}/reveal`),
   openExport: (id: string) => post<{ ok: boolean }>(`/api/exports/${id}/open`),
   deleteExport: (id: string) => del<void>(`/api/exports/${id}`),
-  asrModels: () => get<{ supported: boolean; models: AsrModel[] }>('/api/asr/models'),
+  asrModels: () => get<AsrModelsResponse>('/api/asr/models'),
   downloadModel: (id: string) => post<Job>(`/api/asr/models/${id}/download`),
   deleteModel: (id: string) => del<void>(`/api/asr/models/${id}`),
   analysisSettings: () => get<AnalysisPreferences>('/api/settings/analysis'),
@@ -235,6 +245,12 @@ export const api = {
   claudeLogin: () => post<{ opened: boolean; command?: string }>('/api/claude/login'),
   saveApiKey: (key: string) => put<void>('/api/claude/api-key', { key }),
   deleteApiKey: () => del<void>('/api/claude/api-key'),
+  verifyClaudeKey: () => post<ClaudeKeyCheck>('/api/claude/verify-key'),
+
+  // Community Edition: primera configuración y cierre ordenado
+  setupStatus: () => get<SetupStatus>('/api/setup/status'),
+  completeSetup: (completed = true) => post<{ completed_at?: string }>('/api/setup/complete', { completed }),
+  shutdown: () => post<{ stopping: boolean }>('/api/system/shutdown'),
   plan: (projectId: string) => get<PlanState>(`/api/projects/${projectId}/plan`),
   generatePlan: (projectId: string, body: { style?: StyleId | null; instruction?: string | null; confirm_budget?: boolean }) =>
     post<{ job: Job; session_id: string }>(`/api/projects/${projectId}/plan/generate`, body),

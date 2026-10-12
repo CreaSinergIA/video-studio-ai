@@ -262,6 +262,7 @@ def align_segments(ctx: JobContext) -> dict[str, Any]:
             "Ajusta sus tiempos a mano."
         )
     try:
+        spec = asr_models.require_usable(model_id)
         model_path = asr_models.installed_path(model_id)
     except asr_models.ModelError as exc:
         raise JobError(exc.message) from exc
@@ -275,6 +276,7 @@ def align_segments(ctx: JobContext) -> dict[str, Any]:
         result = transcription.run_worker(
             {
                 "mode": "align",
+                "engine": spec.engine,
                 "wav": str(wav),
                 "model_dir": str(model_path),
                 "segments": items,

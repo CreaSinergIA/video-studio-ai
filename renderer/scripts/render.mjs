@@ -42,22 +42,33 @@ async function doRender(jobPath) {
   const job = JSON.parse(fs.readFileSync(jobPath, 'utf8'))
   if (!job.browserExecutable || !fs.existsSync(job.browserExecutable)) throw new Error('Falta el navegador de render verificado.')
   const chromiumOptions = { disableWebSecurity: false, ignoreCertificateErrors: false, headless: true }
-  const browser = await openBrowser('chrome', {
-    browserExecutable: job.browserExecutable,
-    chromiumOptions,
-    logLevel: 'error',
-  })
+  // La cancelación se atiende desde antes de abrir el navegador: si llega mientras arranca, se
+  // espera a tenerlo para cerrarlo (el navegador vive en su propio grupo de procesos y una
+  // salida inmediata lo dejaría huérfano). El backend, además, vigila el árbol de procesos.
+  let browser = null
+  let stopping = false
   let current = null
   const stop = async () => {
+    stopping = true
     if (current) {
       current.cancel()
       fs.rmSync(current.tmp, { force: true })
     }
+    if (!browser) return // se cierra en cuanto termine de abrirse
     await browser.close({ silent: true }).catch(() => {})
     process.exit(130)
   }
   process.on('SIGTERM', stop)
   process.on('SIGINT', stop)
+  browser = await openBrowser('chrome', {
+    browserExecutable: job.browserExecutable,
+    chromiumOptions,
+    logLevel: 'error',
+  })
+  if (stopping) {
+    await browser.close({ silent: true }).catch(() => {})
+    process.exit(130)
+  }
   try {
     for (const clip of job.clips) {
       const started = Date.now()

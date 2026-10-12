@@ -34,8 +34,10 @@ from typing import Any
 import cv2
 import numpy as np
 
+from app import limits
 from app.domain.preferences import AnalysisPreferences
-from app.services.media_tools import Cancelled, FFmpegError
+from app.platform import processes
+from app.services.media_tools import Cancelled, FFmpegError, Watchdog
 
 log = logging.getLogger(__name__)
 
@@ -124,7 +126,16 @@ def decode_stats(
         "rgb24",
         "-",
     ]
-    proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **processes.group_kwargs()
+    )
+    processes.track(proc)
+    watchdog = Watchdog(
+        proc,
+        cancel=cancel,
+        max_seconds=limits.ffmpeg_max_seconds(duration),
+        stall_seconds=limits.FFMPEG_STALL_SECONDS,
+    )
     times: list[float] = []
     tail: list[str] = []
 
@@ -150,11 +161,12 @@ def decode_stats(
     try:
         while True:
             if cancel is not None and cancel.is_set():
-                proc.kill()
+                processes.terminate_tree(proc, grace=2)
                 raise Cancelled()
             buf = proc.stdout.read(frame_bytes)
             if len(buf) < frame_bytes:
                 break
+            watchdog.tick()
             rgb = np.frombuffer(buf, np.uint8).reshape(h, w, 3)
             gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)
             mean, std = float(gray.mean()), float(gray.std())
@@ -181,10 +193,13 @@ def decode_stats(
                 on_progress(min(0.99, times[-1] / duration))
         proc.wait()
     finally:
+        watchdog.stop()
         if proc.poll() is None:
-            proc.kill()
+            processes.terminate_tree(proc, grace=2)
             proc.wait()
+        processes.untrack(proc)
         reader.join(timeout=5)
+    watchdog.raise_if_stopped()
     if proc.returncode not in (0, None) and idx == 0:
         raise FFmpegError("No se pudo decodificar el video: " + (tail[-1] if tail else ""))
     # showinfo y los fotogramas salen en el mismo orden; por seguridad se igualan longitudes.

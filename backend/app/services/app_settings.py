@@ -14,6 +14,7 @@ STORAGE_KEY = "storage"
 ANALYSIS_KEY = "analysis"
 CLAUDE_KEY = "claude"
 CLAUDE_STATUS_KEY = "claude_status"
+SETUP_KEY = "setup"
 
 
 def _get(session: Session, key: str) -> dict[str, Any]:
@@ -62,10 +63,23 @@ def set_active_storage_id(session: Session, storage_id: str) -> None:
 
 
 def get_analysis(session: Session) -> AnalysisPreferences:
+    from app.services import asr_models
+
+    data = _get(session, ANALYSIS_KEY)
     try:
-        return AnalysisPreferences.model_validate(_get(session, ANALYSIS_KEY))
+        prefs = AnalysisPreferences.model_validate(data)
     except ValueError:
-        return AnalysisPreferences()
+        prefs = AnalysisPreferences()
+    # Sin elección guardada, o con un modelo de un motor que no existe en este equipo (p. ej.
+    # una base de datos traída de otro sistema): el recomendado de esta plataforma.
+    spec = asr_models.CATALOG.get(prefs.transcription_model)
+    if not data.get("transcription_model") or (
+        spec is not None
+        and asr_models.platform_supported()
+        and not asr_models.engine_available(spec.engine)
+    ):
+        prefs = prefs.model_copy(update={"transcription_model": asr_models.default_model_id()})
+    return prefs
 
 
 def save_analysis(session: Session, prefs: AnalysisPreferences) -> AnalysisPreferences:
@@ -92,3 +106,12 @@ def get_claude_status(session: Session) -> dict[str, Any]:
 
 def save_claude_status(session: Session, status: dict[str, Any]) -> None:
     _put(session, CLAUDE_STATUS_KEY, status)
+
+
+def get_setup(session: Session) -> dict[str, Any]:
+    """Estado de la primera configuración (``completed_at`` cuando el usuario la cierra)."""
+    return _get(session, SETUP_KEY)
+
+
+def save_setup(session: Session, value: dict[str, Any]) -> None:
+    _put(session, SETUP_KEY, value)

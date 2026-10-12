@@ -19,6 +19,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import ntpath
 import os
 import shutil
 import subprocess
@@ -32,7 +33,8 @@ from pathlib import Path
 from typing import Any
 
 from app.config import get_settings
-from app.platform import processes
+from app.platform import processes, tools
+from app.platform.detect import detect
 from app.services.media_tools import Cancelled
 
 log = logging.getLogger(__name__)
@@ -42,15 +44,52 @@ RENDERER_DIR = REPO_DIR / "renderer"
 FONTS_DIR = Path(__file__).resolve().parents[1] / "resources" / "fonts"
 
 REMOTION_VERSION = "4.0.534"
+_CFT = "https://storage.googleapis.com/chrome-for-testing-public/157.0.8080.0"
+# Por plataforma: tamaño y MD5 publicados por Google (cabecera x-goog-hash) y SHA-256 fijado
+# (calculado al preparar esta versión; el MD5 coincide con el de Google).
+BROWSERS: dict[str, dict[str, Any]] = {
+    "mac-arm64": {
+        "url": f"{_CFT}/mac-arm64/chrome-headless-shell-mac-arm64.zip",
+        "size": 103_864_219,
+        "md5_b64": "+fkyl3YdZLGBlWo7N14QWA==",
+        "sha256": "8cd31d4bc5f7ea0930940292f1972c68f4296b01fbcb4fa709841a8f60eba95d",
+        "folder": "chrome-headless-shell-mac-arm64",
+        "executable": "chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    },
+    "mac-x64": {
+        "url": f"{_CFT}/mac-x64/chrome-headless-shell-mac-x64.zip",
+        "size": 109_113_968,
+        "md5_b64": "rGlRi5SZXJgnvyV+jyWdtA==",
+        "sha256": "b4a3f7e8aed11e7814fdaf49ddadab0ec3e0c7527f0ffeed5b208d7a856ebf6a",
+        "folder": "chrome-headless-shell-mac-x64",
+        "executable": "chrome-headless-shell-mac-x64/chrome-headless-shell",
+    },
+    "win64": {
+        "url": f"{_CFT}/win64/chrome-headless-shell-win64.zip",
+        "size": 125_915_690,
+        "md5_b64": "ezp50AgeVIxN+wNbiW38MA==",
+        "sha256": "ad0fe78fbe0783035fd71f81cd876a2e81962a40ac7de6b4f7afcbeb00901c11",
+        "folder": "chrome-headless-shell-win64",
+        "executable": "chrome-headless-shell-win64/chrome-headless-shell.exe",
+    },
+}
+
+
+def _browser_platform() -> str | None:
+    info = detect()
+    if info.os == "macos":
+        return "mac-arm64" if info.arch == "arm64" else "mac-x64"
+    if info.os == "windows" and info.arch == "x86_64":
+        return "win64"
+    return None
+
+
+_KEY = _browser_platform()
 BROWSER: dict[str, Any] = {
     "name": "Chrome Headless Shell (Chrome for Testing)",
     "version": "157.0.8080.0",
-    "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8080.0/mac-arm64/chrome-headless-shell-mac-arm64.zip",
-    "size": 103_864_219,
-    "md5_b64": "+fkyl3YdZLGBlWo7N14QWA==",  # cabecera x-goog-hash publicada por Google
-    # SHA-256 fijado (dos descargas independientes coinciden): no depender solo de MD5.
-    "sha256": "8cd31d4bc5f7ea0930940292f1972c68f4296b01fbcb4fa709841a8f60eba95d",
-    "executable": "chrome-headless-shell-mac-arm64/chrome-headless-shell",
+    "platform": _KEY,
+    **(BROWSERS[_KEY] if _KEY else {"url": None, "size": 0, "executable": "-"}),
 }
 RENDER_FONTS = [
     "Inter-Variable.ttf",
@@ -90,8 +129,17 @@ def browser_executable() -> Path | None:
 
 
 def find_node() -> Path | None:
+    """Node.js: copia portátil del instalador, ``VSA_NODE``, el PATH o instalaciones típicas.
+    Solo se acepta una versión compatible (``tools.NODE_MIN``)."""
+    cands: list[Path] = []
+    if os.environ.get("VSA_NODE"):
+        cands.append(Path(os.environ["VSA_NODE"]))
+    portable = tools.installed_executable(get_settings().home, "node")
+    if portable is not None:
+        cands.append(portable)
     found = shutil.which("node")
-    cands = [Path(found)] if found else []
+    if found:
+        cands.append(Path(found))
     nvm = Path.home() / ".nvm" / "versions" / "node"
     if nvm.is_dir():
         cands += sorted(
@@ -99,9 +147,13 @@ def find_node() -> Path | None:
             key=lambda p: [int(x) for x in p.parts[-3][1:].split(".") if x.isdigit()],
             reverse=True,
         )
-    cands += [Path("/opt/homebrew/bin/node"), Path("/usr/local/bin/node")]
+    if os.name == "nt":
+        program_files = os.environ.get("PROGRAMFILES", r"C:\Program Files")
+        cands.append(Path(program_files) / "nodejs" / "node.exe")
+    else:
+        cands += [Path("/opt/homebrew/bin/node"), Path("/usr/local/bin/node")]
     for c in cands:
-        if c.is_file() and os.access(c, os.X_OK):
+        if c.is_file() and os.access(c, os.X_OK) and tools.node_is_suitable(c):
             return c
     return None
 
@@ -125,18 +177,23 @@ def status() -> dict[str, Any]:
     if node:
         with contextlib.suppress(OSError, subprocess.TimeoutExpired):
             node_version = subprocess.run(
-                [str(node), "--version"], capture_output=True, text=True, timeout=10
+                [str(node), "--version"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
             ).stdout.strip()
     pkg = RENDERER_DIR / "node_modules" / "@remotion" / "renderer" / "package.json"
     remotion = None
     if pkg.is_file():
         with contextlib.suppress(OSError, ValueError):
-            remotion = json.loads(pkg.read_text()).get("version")
+            remotion = json.loads(pkg.read_text(encoding="utf-8")).get("version")
     exe = browser_executable()
     manifest: dict[str, Any] = {}
     if exe:
         with contextlib.suppress(OSError, ValueError):
-            manifest = json.loads((browser_dir() / "vsa-browser.json").read_text())
+            manifest = json.loads((browser_dir() / "vsa-browser.json").read_text(encoding="utf-8"))
     ready = bool(node and remotion == REMOTION_VERSION and exe)
     return {
         "ready": ready,
@@ -154,8 +211,10 @@ def status() -> dict[str, Any]:
             "installed_at": manifest.get("installed_at"),
         },
         "license": (
-            "Remotion: licencia gratuita para personas y equipos de hasta 3 integrantes "
-            "(confirmada por el usuario)."
+            "Remotion tiene licencia propia: es gratuito para personas, organizaciones sin ánimo "
+            "de lucro y empresas de hasta 3 personas; las organizaciones mayores necesitan su "
+            "propia licencia de Remotion (remotion.pro/license). Cada usuario es responsable de "
+            "cumplir sus condiciones."
         ),
     }
 
@@ -166,6 +225,11 @@ def install_browser(
     """Descarga explícita y verificada del navegador de render."""
     if browser_executable() is not None:
         return {"already_installed": True}
+    if not BROWSER.get("url"):
+        raise EngineError(
+            "browser_unsupported",
+            "No hay un navegador de render preparado para este sistema (Windows x64 o macOS).",
+        )
     target = browser_dir()
     target.parent.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="browser-", dir=engines_dir()))
@@ -204,23 +268,27 @@ def install_browser(
                 "browser_hash", "La huella SHA-256 del navegador no coincide con la esperada."
             )
         unpack = work / "unpacked"
-        subprocess.run(["ditto", "-x", "-k", str(zpath), str(unpack)], check=True, timeout=300)
+        macos = detect().os == "macos"
+        if macos:
+            # ditto conserva enlaces simbólicos y la firma de código del paquete.
+            subprocess.run(["ditto", "-x", "-k", str(zpath), str(unpack)], check=True, timeout=300)
+        else:
+            unpack.mkdir()
+            tools.safe_extract(zpath, unpack)
         exe = unpack / BROWSER["executable"]
         if not exe.is_file():
             raise EngineError(
                 "browser_layout", "El archivo descargado no contiene el ejecutable esperado."
             )
-        signed = _codesign_ok(exe.parent / "chrome-headless-shell") and _codesign_ok(exe)
-        if not signed:
+        # macOS: además de las huellas, la firma de código de Google. En Windows el ejecutable
+        # se verifica por su SHA-256 fijado (ya comprobado arriba).
+        if macos and not _codesign_ok(exe):
             raise EngineError("browser_codesign", "La firma de código del navegador no es válida.")
         on_progress(0.97)
         if target.exists():
-            shutil.rmtree(target)
+            shutil.rmtree(target, ignore_errors=True)
         target.mkdir(parents=True)
-        shutil.move(
-            str(unpack / "chrome-headless-shell-mac-arm64"),
-            str(target / "chrome-headless-shell-mac-arm64"),
-        )
+        shutil.move(str(unpack / BROWSER["folder"]), str(target / BROWSER["folder"]))
         manifest = {
             "name": BROWSER["name"],
             "version": BROWSER["version"],
@@ -228,10 +296,10 @@ def install_browser(
             "size": got,
             "md5_b64": BROWSER["md5_b64"],
             "sha256": sha.hexdigest(),
-            "codesign": "válida (codesign --verify --deep --strict)",
+            "codesign": "válida (codesign --verify --deep --strict)" if macos else None,
             "installed_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         }
-        (target / "vsa-browser.json").write_text(json.dumps(manifest, indent=2))
+        (target / "vsa-browser.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         on_progress(1.0)
         return manifest
     finally:
@@ -260,11 +328,22 @@ def source_hash() -> str:
     return h.hexdigest()[:16]
 
 
-def _env(node: Path) -> dict[str, str]:
+def _env(node: Path, windows: bool | None = None) -> dict[str, str]:
     # Entorno mínimo: sin claves, tokens ni variables de Claude/Anthropic.
-    keep = {"HOME", "TMPDIR", "LANG", "LC_ALL", "USER"}
-    env = {k: v for k, v in os.environ.items() if k in keep}
-    env["PATH"] = f"{node.parent}:/usr/bin:/bin:/usr/sbin:/sbin"
+    if windows if windows is not None else os.name == "nt":
+        # Windows necesita estas variables para crear procesos, temporales y el navegador.
+        keep = {
+            "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE",
+            "HOMEPATH", "LOCALAPPDATA", "APPDATA", "PROGRAMDATA", "COMSPEC", "PATHEXT",
+            "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "USERNAME", "LANG",
+        }  # fmt: skip
+        env = {k: v for k, v in os.environ.items() if k.upper() in keep}
+        system32 = ntpath.join(os.environ.get("SYSTEMROOT", r"C:\Windows"), "System32")
+        env["PATH"] = ";".join([str(node.parent), system32])
+    else:
+        keep = {"HOME", "TMPDIR", "LANG", "LC_ALL", "USER"}
+        env = {k: v for k, v in os.environ.items() if k in keep}
+        env["PATH"] = os.pathsep.join([str(node.parent), "/usr/bin", "/bin", "/usr/sbin", "/sbin"])
     env["NODE_OPTIONS"] = "--max-old-space-size=3072"
     env["REMOTION_DISABLE_TELEMETRY"] = "1"
     return env
@@ -335,7 +414,7 @@ def render_clips(
             "clips": [{"key": c.key, "spec": c.spec, "out": str(c.out)} for c in clips],
         }
         path = work / "job.json"
-        path.write_text(json.dumps(job, ensure_ascii=False))
+        path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
         return _run_node(
             node, ["render", str(path)], timeout=timeout, cancel=cancel, on_event=on_event
         )
@@ -362,8 +441,12 @@ def _run_node(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         **processes.group_kwargs(),
     )
+    processes.track(proc)
+    tree = processes.TreeWatcher(proc)
     started = time.monotonic()
     killed: dict[str, str] = {}
     events: list[dict[str, Any]] = []
@@ -371,10 +454,15 @@ def _run_node(
 
     def _kill(reason: str) -> None:
         killed.setdefault("reason", reason)
+        tree.snapshot()  # incluir lo que se haya lanzado justo antes de cancelar
         processes.terminate_tree(proc, grace=5)
 
     def _watch() -> None:
+        ticks = 0
         while proc.poll() is None:
+            if ticks % 3 == 0:
+                tree.snapshot()  # el navegador de Remotion crea su propio grupo de procesos
+            ticks += 1
             if cancel is not None and cancel.is_set():
                 _kill("cancelled")
                 return
@@ -401,6 +489,10 @@ def _run_node(
         if on_event:
             on_event(ev)
     proc.wait()
+    # Sea cual sea el final (normal, cancelado, error o tiempo agotado), no queda ningún
+    # descendiente vivo: en particular, el navegador de render.
+    tree.reap()
+    processes.untrack(proc)
     if killed.get("reason") == "cancelled":
         raise Cancelled()
     if killed.get("reason") == "timeout":

@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
-# Video Studio AI — lanzador local.
+# Video Studio AI — Community Edition: lanzador para macOS (y Linux, no validado).
 #
-#   ./videostudio start     Prepara lo necesario, inicia el panel y abre el navegador
-#   ./videostudio stop      Detiene el panel
+#   ./videostudio install   Instalador guiado (requisitos, dependencias, motor, modelo, acceso)
+#   ./videostudio start     Inicia el panel (o reutiliza el que ya está en marcha) y lo abre
+#   ./videostudio stop      Cierra el panel sin dejar procesos en segundo plano
 #   ./videostudio restart   Reinicia
-#   ./videostudio status    Muestra si está en ejecución
-#   ./videostudio logs      Sigue el registro del servidor
-#   ./videostudio setup     Instala/actualiza dependencias locales (sin instalaciones globales)
+#   ./videostudio status    Muestra si está en marcha y en qué dirección
+#   ./videostudio open      Abre el panel en el navegador
+#   ./videostudio logs [-f] Muestra el registro del servidor
+#   ./videostudio doctor    Diagnóstico del equipo y de la instalación
 #   ./videostudio dev       Modo desarrollo (Vite con recarga + API con recarga)
-#   ./videostudio check     Ejecuta todas las validaciones (tests, typecheck, lint, build)
+#   ./videostudio check     Validaciones del proyecto (lint, tipos, pruebas, build)
+#
+# Opciones del instalador: --yes (acepta lo recomendado), --no-model, --model <id>,
+# --no-browser-engine, --no-shortcut, --no-start. Nada se instala de forma global.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$ROOT/backend"
 FRONTEND="$ROOT/frontend"
 RENDERER="$ROOT/renderer"
-PORT="${VSA_PORT:-8775}"  # Community Edition: puerto propio
-HOST="127.0.0.1"
-URL="http://$HOST:$PORT"
+PY="$BACKEND/.venv/bin/python"
 
 if [[ -n "${VSA_HOME:-}" ]]; then
   DATA_HOME="$VSA_HOME"
@@ -26,186 +29,138 @@ elif [[ "$(uname)" == "Darwin" ]]; then
 else
   DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/videostudioai-community"
 fi
-RUN_DIR="$DATA_HOME/run"
-PID_FILE="$RUN_DIR/server.pid"
-LOG_FILE="$DATA_HOME/logs/server.out"
+TOOLS="$DATA_HOME/tools"
 
-# Homebrew no siempre está en el PATH cuando se lanza desde Finder (.command).
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+# Versión fijada de uv (gestor de Python) si hay que descargarlo: huellas de su publicación.
+UV_VERSION="0.12.18"
+uv_asset() {
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64) echo "uv-aarch64-apple-darwin.tar.gz cf40e0c6a202190ccd9e0406dcfdd5b2d6668a9a5c779b17948963df32aafe5b" ;;
+    Darwin-x86_64) echo "uv-x86_64-apple-darwin.tar.gz 2e4108f5395397c8bc5d43bf83d3bdbb2d0e92b90d0efa607756be704905fa33" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Desde Finder (.command o acceso directo) el PATH es mínimo.
+export PATH="$TOOLS/uv:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+# Python gestionado por uv dentro de la carpeta de datos (no se toca el Python del sistema).
+export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$TOOLS/python}"
+export PYTHONUTF8=1
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '  \033[36m›\033[0m %s\n' "$*"; }
 ok() { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
-require() {
-  command -v "$1" >/dev/null 2>&1 || fail "Falta «$1». $2"
+has_flag() { local f="$1"; shift; for a in "$@"; do [[ "$a" == "$f" || "$a" == "-y" && "$f" == "--yes" ]] && return 0; done; return 1; }
+
+confirm() {
+  # confirm "pregunta" [args del instalador]: --yes o sin terminal → sí.
+  local q="$1"; shift
+  if has_flag --yes "$@" || [[ ! -t 0 ]]; then info "$q → sí"; return 0; fi
+  read -r -p "  ? $q [S/n] " a
+  [[ -z "$a" || "$a" =~ ^[sSyY] ]]
 }
 
-check_tools() {
-  require node "Instala Node.js 20+ (https://nodejs.org o brew install node)."
-  require npm "Se instala junto con Node.js."
-  require uv "Instala uv (brew install uv)."
-  require ffmpeg "Instala FFmpeg (brew install ffmpeg)."
-  require ffprobe "Se instala junto con FFmpeg."
-}
-
-setup() {
-  bold "Preparando dependencias locales"
-  check_tools
-  info "Backend (Python, entorno en backend/.venv)…"
-  (cd "$BACKEND" && uv sync --quiet) && ok "Backend listo"
-  info "Frontend (node_modules locales)…"
-  if [[ -f "$FRONTEND/package-lock.json" ]]; then
-    (cd "$FRONTEND" && npm ci --no-fund --no-audit --loglevel=error) && ok "Frontend listo"
-  else
-    (cd "$FRONTEND" && npm install --no-fund --no-audit --loglevel=error) && ok "Frontend listo"
-  fi
-  # Fase 4: motor de animaciones (Remotion, versiones fijadas en package-lock.json). El navegador
-  # de render se descarga aparte, solo desde el panel (Ajustes → Motor de animaciones).
-  info "Motor de animaciones (renderer/node_modules)…"
-  (cd "$RENDERER" && npm ci --no-fund --no-audit --loglevel=error) && ok "Motor de animaciones listo"
-}
-
-ensure_deps() {
-  [[ -x "$BACKEND/.venv/bin/python" && -d "$FRONTEND/node_modules" && -d "$RENDERER/node_modules" ]] || setup
-}
-
-needs_build() {
-  local index="$FRONTEND/dist/index.html"
-  [[ ! -f "$index" ]] && return 0
-  [[ -n "$(find "$FRONTEND/src" "$FRONTEND/index.html" "$FRONTEND/package.json" "$FRONTEND/vite.config.ts" -newer "$index" -print -quit 2>/dev/null)" ]]
-}
-
-build_frontend() {
-  if needs_build; then
-    info "Compilando el panel…"
-    (cd "$FRONTEND" && npm run build --silent >/dev/null) && ok "Panel compilado"
-  fi
-}
-
-server_pid() {
-  [[ -f "$PID_FILE" ]] || return 1
-  local pid
-  pid="$(cat "$PID_FILE")"
-  # Comprobar que el PID sigue siendo nuestro servidor (el sistema reutiliza PIDs).
-  if kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -q "run.py"; then
-    echo "$pid"
-    return 0
-  fi
-  rm -f "$PID_FILE"
+find_uv() {
+  if command -v uv >/dev/null 2>&1; then command -v uv; return 0; fi
+  [[ -x "$TOOLS/uv/uv" ]] && { echo "$TOOLS/uv/uv"; return 0; }
   return 1
 }
 
-healthy() {
-  curl -fsS --max-time 2 "$URL/api/health" >/dev/null 2>&1
+install_uv() {
+  local spec name sha url tmp
+  spec="$(uv_asset)"
+  [[ -n "$spec" ]] || fail "No hay una descarga de uv preparada para este sistema. Instálalo: https://docs.astral.sh/uv/"
+  name="${spec%% *}"; sha="${spec##* }"
+  url="https://github.com/astral-sh/uv/releases/download/$UV_VERSION/$name"
+  info "uv no está instalado. Se descargará uv $UV_VERSION (gestor de Python de Astral, ~17 MB)"
+  info "en $TOOLS/uv, verificando su huella SHA-256. No se instala nada en el sistema."
+  confirm "¿Descargar uv portátil?" "$@" || fail "uv es necesario para preparar Python."
+  tmp="$(mktemp -d)"
+  curl -fsSL "$url" -o "$tmp/$name" || fail "No se pudo descargar uv ($url)."
+  echo "$sha  $tmp/$name" | shasum -a 256 -c - >/dev/null || { rm -rf "$tmp"; fail "La huella de uv no coincide; descarga descartada."; }
+  mkdir -p "$TOOLS/uv"
+  tar -xzf "$tmp/$name" -C "$tmp"
+  cp "$tmp"/uv-*/uv "$tmp"/uv-*/uvx "$TOOLS/uv/" && chmod +x "$TOOLS/uv/uv" "$TOOLS/uv/uvx"
+  rm -rf "$tmp"
+  ok "uv $UV_VERSION instalado en $TOOLS/uv"
 }
 
-open_browser() {
-  if [[ "${VSA_NO_BROWSER:-}" == "1" ]]; then return; fi
-  if command -v open >/dev/null 2>&1; then open "$URL"
-  elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 || true
+python_env() {
+  # Entorno de Python del backend (backend/.venv) con las versiones fijadas en uv.lock.
+  local uv
+  uv="$(find_uv)" || { install_uv "$@"; uv="$(find_uv)"; }
+  export VSA_UV="$uv"
+  local extra=()
+  # Complemento opcional de NVIDIA (Windows/Linux): se conserva si se instaló antes.
+  if has_flag --cuda "$@" || [[ -f "$DATA_HOME/cuda.enabled" ]]; then extra=(--extra cuda); fi
+  local dev=(--no-dev)
+  [[ "${VSA_DEV_DEPS:-}" == "1" ]] && dev=()
+  info "Preparando Python 3.12 y las dependencias del backend (uv sync)…"
+  (cd "$BACKEND" && "$uv" sync --frozen --quiet "${dev[@]}" "${extra[@]}") || fail "uv sync falló. Revisa tu conexión y vuelve a ejecutar ./videostudio install."
+  ok "Backend listo (backend/.venv)"
+}
+
+ensure_installed() {
+  if [[ ! -x "$PY" ]] || ! grep -q '"completed_at"' "$DATA_HOME/install-state.json" 2>/dev/null; then
+    bold "Video Studio AI aún no está instalado en este equipo: se ejecuta el instalador."
+    install_cmd "$@"
+    exit $?
   fi
 }
 
-start() {
-  bold "Video Studio AI"
-  if pid="$(server_pid)"; then
-    ok "Ya está en ejecución (PID $pid) → $URL"
-    open_browser
-    return
+install_cmd() {
+  bold "Video Studio AI — Community Edition · instalación"
+  if [[ "$(uname)" == "Darwin" ]] && ! xcode-select -p >/dev/null 2>&1; then
+    info "Aviso: las Command Line Tools de Xcode no están instaladas. No son necesarias."
   fi
-  if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    fail "El puerto $PORT está ocupado por otro programa. Usa VSA_PORT=otro_puerto ./videostudio start"
-  fi
-  check_tools
-  ensure_deps
-  build_frontend
-  mkdir -p "$RUN_DIR" "$(dirname "$LOG_FILE")"
-  info "Iniciando servidor en $URL (solo accesible desde este equipo)…"
-  (
-    cd "$BACKEND"
-    VSA_PORT="$PORT" nohup "$BACKEND/.venv/bin/python" run.py >>"$LOG_FILE" 2>&1 &
-    echo $! >"$PID_FILE"
-  )
-  for _ in $(seq 1 60); do
-    if healthy; then
-      ok "Panel listo → $URL"
-      open_browser
-      return
-    fi
-    if ! server_pid >/dev/null; then
-      tail -n 20 "$LOG_FILE" >&2 || true
-      fail "El servidor no pudo arrancar. Registro: $LOG_FILE"
-    fi
-    sleep 0.5
-  done
-  fail "El servidor tarda demasiado en responder. Registro: $LOG_FILE"
-}
-
-stop() {
-  if pid="$(server_pid)"; then
-    info "Deteniendo (PID $pid)…"
-    kill "$pid" 2>/dev/null || true
-    for _ in $(seq 1 30); do
-      kill -0 "$pid" 2>/dev/null || break
-      sleep 0.5
-    done
-    if kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= | grep -q "run.py"; then
-      kill -9 "$pid" 2>/dev/null || true
-    fi
-    rm -f "$PID_FILE"
-    ok "Detenido"
-  else
-    ok "No estaba en ejecución"
-  fi
-}
-
-status() {
-  if pid="$(server_pid)" && healthy; then
-    ok "En ejecución (PID $pid) → $URL"
-    info "Datos: $DATA_HOME"
-  elif pid="$(server_pid)"; then
-    info "Proceso $pid activo pero sin responder todavía"
-  else
-    info "Detenido"
-  fi
-}
-
-dev() {
-  check_tools
-  ensure_deps
-  bold "Modo desarrollo — panel en http://127.0.0.1:5173 (Ctrl+C para salir)"
-  trap 'kill 0' EXIT INT TERM
-  (cd "$BACKEND" && VSA_PORT="$PORT" .venv/bin/uvicorn app.main:create_app --factory \
-    --host "$HOST" --port "$PORT" --reload --reload-dir app) &
-  (cd "$FRONTEND" && VSA_BACKEND_URL="$URL" npm run dev) &
-  wait
+  command -v curl >/dev/null || fail "Falta curl."
+  python_env "$@"
+  cd "$BACKEND" && exec "$PY" -m app.installer "$@"
 }
 
 check() {
-  check_tools
-  ensure_deps
+  ensure_installed
+  VSA_DEV_DEPS=1 python_env
+  local node_dir
+  node_dir="$(cd "$BACKEND" && "$PY" -c 'from app.services.render_engine import find_node; n=find_node(); print(n.parent if n else "")')"
+  [[ -n "$node_dir" ]] && export PATH="$node_dir:$PATH"
   bold "Backend"
-  # Las pruebas de transcripción usan los modelos ya descargados por la app (si existen).
   local models="${VSA_TEST_MODELS_DIR:-$DATA_HOME/models}"
   (cd "$BACKEND" && .venv/bin/ruff check app tests run.py migrations && .venv/bin/mypy app \
     && VSA_TEST_MODELS_DIR="$models" .venv/bin/pytest -q -o addopts="" -rs)
   bold "Frontend"
-  (cd "$FRONTEND" && npm run typecheck && npm run lint && npm run build)
+  (cd "$FRONTEND" && npm run typecheck && npm run lint && npx vite build --outDir "${VSA_CHECK_DIST:-$(mktemp -d)}" --emptyOutDir --logLevel error)
   bold "Motor de animaciones"
   (cd "$RENDERER" && npx tsc --noEmit)
   ok "Todas las validaciones superadas"
 }
 
-case "${1:-start}" in
-  start) start ;;
-  stop) stop ;;
-  restart) stop; start ;;
-  status) status ;;
-  logs) mkdir -p "$(dirname "$LOG_FILE")"; touch "$LOG_FILE"; tail -n 50 -f "$LOG_FILE" ;;
-  setup) setup ;;
+dev() {
+  ensure_installed
+  local port="${VSA_PORT:-8775}" token
+  token="$(cd "$BACKEND" && "$PY" -c 'from app.config import get_settings; from app.session import ensure_token; print(ensure_token(get_settings().home))')"
+  bold "Modo desarrollo — abre http://127.0.0.1:5173/open?t=$token (Ctrl+C para salir)"
+  trap 'kill 0' EXIT INT TERM
+  (cd "$BACKEND" && VSA_PORT="$port" .venv/bin/uvicorn app.main:create_app --factory \
+    --host 127.0.0.1 --port "$port" --reload --reload-dir app) &
+  (cd "$FRONTEND" && VSA_BACKEND_URL="http://127.0.0.1:$port" npm run dev) &
+  wait
+}
+
+launcher() {
+  ensure_installed
+  cd "$BACKEND" && exec "$PY" -m app.launcher "$@"
+}
+
+cmd="${1:-start}"
+[[ $# -gt 0 ]] && shift
+case "$cmd" in
+  install|setup) install_cmd "$@" ;;
+  start|stop|restart|status|open|logs|doctor) launcher "$cmd" "$@" ;;
   dev) dev ;;
   check) check ;;
-  *) sed -n '2,12p' "$0"; exit 1 ;;
+  -h|--help|help) sed -n '2,17p' "$0" ;;
+  *) sed -n '2,17p' "$0"; exit 1 ;;
 esac

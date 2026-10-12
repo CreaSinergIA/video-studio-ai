@@ -16,8 +16,7 @@ import {
   formatFps,
   formatResolution,
   ORIENTATION_LABEL,
-  resolutionLabel,
-} from '@/lib/format'
+  resolutionLabel, FILE_MANAGER } from '@/lib/format'
 import type { Asset, ProjectDetail } from '@/lib/types'
 
 function Row({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -57,7 +56,7 @@ export function MetadataPanel({ project, asset }: { project: ProjectDetail; asse
     <div>
       <div className="flex flex-wrap gap-2 border-b border-line px-5 py-4">
         <Button size="sm" variant="secondary" icon={<FolderSearch className="size-3.5" />} disabled={!available} onClick={() => run(() => api.reveal(asset.id))}>
-          Mostrar en Finder
+          Mostrar en {FILE_MANAGER}
         </Button>
         <Button size="sm" variant="secondary" icon={<ShieldCheck className="size-3.5" />} disabled={!available || busy} onClick={() => run(() => api.verify(asset.id), 'Verificación en curso')}>
           Verificar integridad

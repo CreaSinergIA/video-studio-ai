@@ -17,7 +17,7 @@ import { Spinner } from '@/components/ui/feedback'
 import { keys, useSystemInfo } from '@/hooks/queries'
 import { ApiError, api } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { formatBytes } from '@/lib/format'
+import { formatBytes, FILE_MANAGER } from '@/lib/format'
 import type { StorageCandidate } from '@/lib/types'
 
 function useDebounced<T>(value: T, delay: number): T {
@@ -136,7 +136,7 @@ export function StoragePicker({
         setBrowsePath(res.path)
       }
     } catch (err) {
-      toast.error('No se pudo abrir Finder', { description: err instanceof ApiError ? err.message : String(err) })
+      toast.error(`No se pudo abrir ${FILE_MANAGER}`, { description: err instanceof ApiError ? err.message : String(err) })
     } finally {
       setPicking(false)
     }
@@ -185,7 +185,7 @@ export function StoragePicker({
         </div>
         {system?.native_dialogs && (
           <Button size="lg" variant="secondary" onClick={pickNative} loading={picking} icon={<FolderOpen className="size-4" />}>
-            Elegir en Finder
+            Elegir en {FILE_MANAGER}
           </Button>
         )}
       </div>

@@ -1,47 +1,31 @@
-# Licencias — propuesta y estado
+# Licencias — estado
 
-> **Estado: PENDIENTE DE DECISIÓN DEL AUTOR.** Mientras no se añada un archivo `LICENSE`, el código original de este repositorio no concede derechos de uso a terceros (todos los derechos reservados). Este documento recoge la propuesta y los bloqueos detectados. No es asesoramiento legal.
+> Documento informativo; no es asesoramiento legal.
 
-## Qué cubriría la licencia del proyecto
-**Solo el código original** de Video Studio AI:
-- backend (`backend/app`);
-- panel (`frontend/src`);
-- componentes y estilos del motor (`renderer/src`);
-- scripts y documentación propios.
+## Código original del proyecto
+- **Pendiente:** la licencia sencilla del código original se elegirá al preparar la publicación en GitHub. Hasta entonces no hay archivo `LICENSE` (todos los derechos reservados).
+- **Qué cubrirá:** solo el código original — backend (`backend/app`), panel (`frontend/src`), componentes y estilos del motor (`renderer/src`), lanzadores, scripts y documentación propios.
+- **Nunca cubrirá** a terceros: Remotion y sus paquetes, el navegador de render, FFmpeg, Node.js, uv, los modelos (Whisper, YuNet), las fuentes ni ninguna dependencia de npm o PyPI. Todos conservan sus licencias ([THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)).
+- **Importante para publicar:** sin una licencia, quien descargue el repositorio puede verlo pero no tiene concedido el derecho de usarlo o modificarlo. Elegir una licencia permisiva antes de publicar resuelve esto.
 
-**Nunca** cubriría:
-- Remotion ni sus paquetes;
-- el navegador de render;
-- FFmpeg;
-- los modelos (Whisper, YuNet);
-- las fuentes;
-- ninguna dependencia de npm o PyPI.
+## Componentes de terceros: cómo se distribuyen
+| Componente | Licencia | Cómo llega al usuario | Obligación para este proyecto |
+|---|---|---|---|
+| Remotion 4.0.x | Remotion License (propia, *source-available*) | dependencia independiente, instalada con `npm` desde su registro oficial; no está en el repositorio | Mantener el aviso: gratuito para personas, organizaciones sin ánimo de lucro y empresas de hasta 3 personas; las mayores necesitan su propia licencia (https://www.remotion.pro/license). Cada usuario es responsable de sus condiciones. |
+| Chrome Headless Shell | términos de Google | descargado de Google en el equipo del usuario, con verificación | Ninguna redistribución. |
+| FFmpeg 9.0.2 | GPL (compilaciones de Martin Riedl y Gyan Doshi) | descargado del proveedor en el equipo del usuario, solo si falta | Ninguna redistribución. Si algún día se **empaqueta** FFmpeg dentro de un instalador, habrá que cumplir la GPL (ofrecer el código fuente) o usar una compilación LGPL. |
+| Node.js 24 LTS | MIT y componentes | descargado de nodejs.org solo si falta | Ninguna redistribución. |
+| uv / Python 3.12 | MIT/Apache-2.0 · PSF | descargados solo si faltan | Ninguna redistribución. |
+| Modelos Whisper (MLX y faster-whisper) | MIT (pesos de OpenAI; conversiones de faster-whisper MIT; las de `mlx-community` no declaran licencia) | descargados de Hugging Face a petición | Ninguna redistribución. |
+| Bibliotecas CUDA (opcional) | licencia de NVIDIA | descargadas de PyPI por el usuario con `--cuda` | Ninguna redistribución. |
+| YuNet (rostros) | MIT | **incluido** en el repositorio con su licencia | Mantener el aviso (hecho). |
+| Fuentes | SIL OFL 1.1 | **incluidas** con su licencia | Mantener avisos; no venderlas por separado (hecho). |
+| Dependencias npm/PyPI | MIT, ISC, BSD, Apache-2.0, MPL-2.0… | gestores de paquetes | Inventario en `docs/licenses/DEPENDENCIES.md`. |
 
-Todos ellos conservan sus licencias ([THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)).
+## Impedimentos reales detectados
+Ninguno impide distribuir el **código** gratuitamente:
+1. **Licencia propia sin elegir** → elegir una licencia permisiva al publicar (decisión del autor).
+2. **Remotion en organizaciones grandes** → no afecta a la distribución del código; el aviso ya está en el README, en el panel (Ajustes → Acerca de y → Animaciones) y en los avisos de terceros.
+3. **FFmpeg GPL** → solo sería relevante si se empaquetara dentro de un instalador comercial; hoy cada usuario lo descarga de su proveedor.
 
-## Propuesta
-**Apache-2.0** para el código original, con un `NOTICE` que:
-- remita a `THIRD_PARTY_NOTICES.md`;
-- advierta que el editor depende de Remotion, que tiene licencia propia: las organizaciones de 4 o más personas necesitan su propia licencia de Remotion.
-
-Motivos:
-- Es una licencia permisiva conocida, con concesión explícita de patentes y protección de marca (§6). Esto conviene si el nombre «Video Studio AI» debe seguir siendo del autor.
-- Permite reutilizar el núcleo en la edición privada sin obligación de publicar sus extensiones.
-- `NOTICE` es el lugar natural para la atribución («Created by Gabo») sin imponer marcas en los videos de los usuarios.
-
-**Alternativas:**
-- **MIT:** más simple, sin cláusula de patentes ni de marca.
-- **Una licencia *source-available* propia:** permitiría restringir usos comerciales, pero dejaría de ser open source y complicaría las contribuciones.
-
-**No usar MIT ni Apache «para todo el conjunto»:** la distribución incluye componentes con licencias distintas, y no se puede relicenciar Remotion.
-
-## Bloqueos y dudas antes de publicar
-1. **Remotion (bloqueante hasta confirmar por escrito con Remotion):**
-   - **Términos vigentes:** qué texto rige la 4.0.x. Hoy es el `LICENSE.md` breve; los *Terms* de la v5 se anuncian para Remotion 5.0.
-   - **Código visible:** si publicar el código fuente completo (que el usuario puede ver y modificar) obliga a las empresas usuarias a tener su propia licencia, aunque sea evidente que la necesitan si superan el umbral.
-   - **Facturación por render:** si cada render local de una empresa usuaria cuenta como uso de *Automators*.
-   - **Obligaciones del autor:** que el autor, con licencia gratuita de persona, no asume ninguna al distribuir la aplicación.
-2. **Claude:** la Community Edition usa solo claves de API de cada usuario (ver [CLAUDE.md](CLAUDE.md)). No se ofrece el inicio de sesión de Claude.ai, prohibido para terceros salvo aprobación.
-3. **Modelos `mlx-community`:** sus fichas no declaran licencia. Se descargan, no se redistribuyen.
-4. **Patentes de códecs (H.264/HEVC/AAC):** dependen del FFmpeg y de los codificadores del sistema del usuario. El proyecto no distribuye codificadores.
-5. **Elección final de la licencia:** decisión del autor.
+No se ha contactado a ningún proveedor ni se usa ninguna licencia personal del autor.

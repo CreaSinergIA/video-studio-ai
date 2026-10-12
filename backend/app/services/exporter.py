@@ -293,7 +293,7 @@ def render_overlay(
     last = "empty.png" if entries[-1][0] == "empty" else f"{entries[-1][0]}.png"
     lines += [f"file '{last}'", "option framerate 1000"]
     listing = out_dir / "overlay.ffconcat"
-    listing.write_text("\n".join(lines) + "\n")
+    listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return listing
 
 
@@ -403,6 +403,8 @@ def probe_output(path: Path) -> dict[str, Any]:
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
         check=False,
     )

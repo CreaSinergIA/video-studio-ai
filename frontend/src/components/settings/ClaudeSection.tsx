@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, KeyRound, LogIn, PlugZap, RefreshCw, Trash } from 'lucide-react'
+import { CircleAlert, CircleCheck, LogIn, PlugZap, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
 import { Badge, ProgressBar, Section } from '@/components/ui/feedback'
-import { Field, Input, Segmented, Slider } from '@/components/ui/fields'
+import { Field, Segmented, Slider } from '@/components/ui/fields'
+import { ClaudeKeyForm, ClaudePricing } from './ClaudeKeyForm'
 import { keys, useClaudeBudget, useClaudeSettings, useClaudeStatus, useClaudeUsage } from '@/hooks/queries'
 import { ApiError, api } from '@/lib/api'
 import { formatRelative } from '@/lib/format'
@@ -64,7 +65,8 @@ function LastCheck({ check }: { check: ClaudeCheck }) {
       {check.ok ? (
         <p className="mt-1 text-xs text-fg-muted">
           Respondió <span className="font-mono text-fg">{check.model_reported}</span> con esfuerzo {check.effort} en{' '}
-          {((check.duration_ms ?? 0) / 1000).toFixed(1)} s{check.cli_version ? ` · Claude Code ${check.cli_version}` : ''}.
+          {((check.duration_ms ?? 0) / 1000).toFixed(1)} s{check.cli_version ? ` · Claude Code ${check.cli_version}` : ''}
+          {check.cost_estimate_usd != null && check.billing === 'api' ? ` · coste estimado ≈ ${check.cost_estimate_usd.toFixed(4)} USD` : ''}.
         </p>
       ) : (
         <p className="mt-1 text-xs text-danger">{check.error}</p>
@@ -78,7 +80,6 @@ export function ClaudeSection() {
   const status = useClaudeStatus()
   const { data: prefs } = useClaudeSettings()
   const [testing, setTesting] = useState(false)
-  const [key, setKey] = useState('')
   const s = status.data
 
   const save = async (patch: Partial<ClaudePreferences>) => {
@@ -159,7 +160,7 @@ export function ClaudeSection() {
                 </Row>
               </>
             )}
-            {s.transport === 'api' && <Row label="Clave de API">{s.api_key_saved ? 'Guardada en el llavero de macOS' : <span className="text-danger">No configurada</span>}</Row>}
+            {s.transport === 'api' && <Row label="Clave de API">{s.api_key_saved ? `Guardada en ${s.key_store ?? 'el llavero del sistema'}` : <span className="text-danger">No configurada</span>}</Row>}
             <Row label="Modelo">
               <span className="font-mono text-xs">{s.model}</span>
               {s.last_check?.ok && s.last_check.model_reported === s.model && <span className="ml-1.5 text-xs text-success">verificado</span>}
@@ -167,7 +168,7 @@ export function ClaudeSection() {
             <Row label="Facturación">
               {s.billing === 'subscription'
                 ? 'Incluido en tu plan (sin cargos por solicitud)'
-                : 'Por tokens en tu cuenta de la Consola de Anthropic'}
+                : 'Por tokens en tu cuenta de la Consola de Claude'}
             </Row>
           </div>
         )}
@@ -200,8 +201,11 @@ export function ClaudeSection() {
             </Button>
           )}
         </div>
+        <div className="mt-3">
+          <ClaudePricing />
+        </div>
         <p className="mt-2 text-xs leading-relaxed text-fg-faint">
-          «Probar conexión» envía una solicitud mínima sin datos tuyos para comprobar autenticación, modelo y esfuerzo.
+          «Probar conexión» envía una solicitud real mínima (sin datos tuyos y con muy pocos tokens: un coste mínimo, del orden de céntimos de dólar o menos) para comprobar autenticación, modelo y esfuerzo. Para comprobar solo la clave, sin coste, usa «Comprobar» junto a la clave.
           {s?.transport === 'claude_code' &&
             ' Con Claude Code las solicitudes consumen los límites de tu plan, compartidos con tu uso habitual de Claude Code. El coste que muestra el consumo es una estimación de Claude Code a precio de lista, no un cargo.'}
         </p>
@@ -223,38 +227,8 @@ export function ClaudeSection() {
           </Field>
           )}
           {prefs.transport === 'api' && (
-            <Field label="Clave de API de Anthropic" hint="Créala en la Consola de Anthropic (console.anthropic.com). Se guarda en el llavero del sistema; nunca en el navegador, en la base de datos ni en archivos del proyecto." stacked>
-              <div className="flex gap-2">
-                <Input type="password" autoComplete="off" placeholder={s?.api_key_saved ? '•••••••• (guardada)' : 'sk-ant-…'} value={key} onChange={(e) => setKey(e.target.value)} />
-                <Button
-                  variant="secondary"
-                  icon={<KeyRound className="size-4" />}
-                  disabled={key.length < 20}
-                  onClick={async () => {
-                    try {
-                      await api.saveApiKey(key.trim())
-                      setKey('')
-                      toast.success('Clave guardada en el llavero')
-                    } catch (err) {
-                      toast.error('No se pudo guardar la clave', { description: errorText(err) })
-                    }
-                    qc.invalidateQueries({ queryKey: keys.claudeStatus })
-                  }}
-                >
-                  Guardar
-                </Button>
-                {s?.api_key_saved && (
-                  <Button
-                    variant="ghost"
-                    icon={<Trash className="size-4" />}
-                    aria-label="Eliminar clave"
-                    onClick={async () => {
-                      await api.deleteApiKey()
-                      qc.invalidateQueries({ queryKey: keys.claudeStatus })
-                    }}
-                  />
-                )}
-              </div>
+            <Field label="Tu clave de API de Anthropic" stacked>
+              <ClaudeKeyForm />
             </Field>
           )}
           <Field label="Modelo" hint="Video Studio AI usa Claude Opus 5.5 para la dirección creativa (independiente del modelo con el que se desarrolla la aplicación).">
@@ -278,9 +252,11 @@ export function ClaudeSection() {
           <Field label="Tiempo máximo por solicitud">
             <Slider label="Tiempo máximo por solicitud" className="w-56" min={60} max={1800} step={30} value={prefs.timeout_seconds} onValueChange={(v) => void save({ timeout_seconds: v })} format={(v) => `${Math.round(v / 60)} min`} />
           </Field>
-          <Field label="Tope de coste estimado por solicitud" hint="Protección ante solicitudes desbordadas (sobre la estimación de Claude Code).">
-            <Slider label="Tope de coste estimado" className="w-56" min={1} max={40} value={Math.round(prefs.max_budget_usd_per_call * 2)} onValueChange={(v) => void save({ max_budget_usd_per_call: v / 2 })} format={(v) => `${(v / 2).toFixed(1)} USD`} />
-          </Field>
+          {prefs.transport === 'claude_code' && (
+            <Field label="Tope de coste estimado por solicitud" hint="Protección ante solicitudes desbordadas (sobre la estimación de Claude Code).">
+              <Slider label="Tope de coste estimado" className="w-56" min={1} max={40} value={Math.round(prefs.max_budget_usd_per_call * 2)} onValueChange={(v) => void save({ max_budget_usd_per_call: v / 2 })} format={(v) => `${(v / 2).toFixed(1)} USD`} />
+            </Field>
+          )}
           <h3 className="pt-2 text-[13px] font-semibold text-fg">Control de solicitudes</h3>
           <Field label="Solicitudes autorizadas en 24 h" hint="Si una operación puede superar este límite, Video Studio AI pide tu confirmación antes de enviarla (solo para esa operación).">
             <Slider label="Solicitudes autorizadas en 24 h" className="w-56" min={1} max={200} value={prefs.daily_request_limit} onValueChange={(v) => void save({ daily_request_limit: v })} />

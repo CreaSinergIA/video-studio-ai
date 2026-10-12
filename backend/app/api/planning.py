@@ -70,7 +70,13 @@ def claude_status(session: Session = Depends(get_session)) -> dict[str, Any]:
         "model": prefs.model,
         "effort": prefs.effort,
         "last_check": last or None,
-        "api_key_saved": claude_client.keychain_has_key() if sys.platform == "darwin" else False,
+        "api_key_saved": claude_client.keychain_has_key(),
+        "key_store": claude_client.keychain_label(),
+        # Precios de lista para estimar el coste (la factura real está en la Consola).
+        "pricing": {
+            "usd_per_mtok": claude_client.PRICING_USD_PER_MTOK.get(prefs.model),
+            "as_of": claude_client.PRICING_AS_OF,
+        },
         # Transportes disponibles en esta edición (la Community Edition: solo clave de API).
         "transports": ["api"] + (["claude_code"] if claude_client.cli_transport_allowed() else []),
     }
@@ -172,19 +178,34 @@ def claude_test(session: Session = Depends(get_session)) -> dict[str, Any]:
     return status
 
 
+@router.post("/claude/verify-key")
+def claude_verify_key(session: Session = Depends(get_session)) -> dict[str, Any]:
+    """Comprueba la clave y el acceso al modelo **sin coste** (API de modelos: no se envía
+    ninguna solicitud al modelo ni cuenta en el control de solicitudes)."""
+    prefs = app_settings.get_claude(session)
+    try:
+        info = claude_client.verify_key(prefs.model)
+    except claude_client.ClaudeError as exc:
+        return {"ok": False, "code": exc.code, "error": exc.message}
+    return {"ok": True, **info}
+
+
 class ApiKeyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     key: str = Field(min_length=20, max_length=300, pattern=r"^sk-ant-[A-Za-z0-9_\-]+$")
 
 
 @router.put("/claude/api-key", status_code=204)
-def put_api_key(body: ApiKeyBody) -> None:
+def put_api_key(body: ApiKeyBody, session: Session = Depends(get_session)) -> None:
     claude_client.keychain_set(body.key)
+    app_settings.save_claude_status(session, {})  # clave nueva: sin verificar todavía
 
 
 @router.delete("/claude/api-key", status_code=204)
-def delete_api_key() -> None:
+def delete_api_key(session: Session = Depends(get_session)) -> None:
     claude_client.keychain_delete()
+    # La última prueba ya no describe la configuración actual.
+    app_settings.save_claude_status(session, {})
 
 
 @router.post("/claude/login")

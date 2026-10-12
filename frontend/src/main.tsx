@@ -27,6 +27,7 @@ import { EditorPage } from '@/pages/EditorPage'
 import { LibraryPage } from '@/pages/LibraryPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { SetupPage } from '@/pages/SetupPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
       { path: '/', element: <LibraryPage /> },
       { path: '/projects/:projectId', element: <EditorPage /> },
       { path: '/settings', element: <SettingsPage /> },
+      { path: '/setup', element: <SetupPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

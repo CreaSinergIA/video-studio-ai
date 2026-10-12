@@ -24,8 +24,7 @@ import {
   formatResolution,
   ORIENTATION_LABEL,
   resolutionLabel,
-  STYLE_META,
-} from '@/lib/format'
+  STYLE_META, FILE_MANAGER } from '@/lib/format'
 import type { ProjectSummary } from '@/lib/types'
 import { Badge, ProgressBar } from '@/components/ui/feedback'
 import { Menu } from '@/components/ui/Menu'
@@ -109,7 +108,7 @@ function menuItems(project: ProjectSummary, actions: CardActions, open: () => vo
     { label: 'Abrir', icon: <Play />, onSelect: open },
     { label: 'Renombrar', icon: <Pencil />, onSelect: () => actions.onRename(project) },
     {
-      label: 'Mostrar en Finder',
+      label: `Mostrar en ${FILE_MANAGER}`,
       icon: <FolderSearch />,
       disabled: !project.source || !project.storage_available,
       onSelect: () => project.source && void api.reveal(project.source.id),

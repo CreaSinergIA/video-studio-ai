@@ -21,6 +21,9 @@ from typing import Any
 
 import numpy as np
 
+from app import limits
+from app.platform import processes
+
 SAMPLE_RATE = 16000
 HOP_SECONDS = 0.01
 _HOP = int(SAMPLE_RATE * HOP_SECONDS)
@@ -59,21 +62,35 @@ def extract_audio(ffmpeg: str, src: Path, dest: Path, cancel: Any = None) -> flo
     # stderr a un archivo: si FFmpeg escribe muchos avisos no puede bloquearse la tubería.
     err_path = dest.with_suffix(".log")
     err_file = open(err_path, "wb")  # noqa: SIM115
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=err_file)
+    from app.services.media_tools import Watchdog
+
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=err_file, **processes.group_kwargs()
+    )
+    processes.track(proc)
+    watchdog = Watchdog(
+        proc,
+        cancel=cancel,
+        max_seconds=limits.ffmpeg_max_seconds(None),
+        stall_seconds=limits.FFMPEG_STALL_SECONDS,
+    )
+    written = -1
     try:
         while proc.poll() is None:
-            if cancel is not None and cancel.is_set():
-                proc.kill()
-                proc.wait()
-                from app.services.media_tools import Cancelled
-
-                raise Cancelled()
+            with contextlib.suppress(OSError):
+                size = dest.stat().st_size
+                if size != written:  # el WAV crece: hay avance real
+                    written = size
+                    watchdog.tick()
             with contextlib.suppress(subprocess.TimeoutExpired):
                 proc.wait(timeout=0.25)
     finally:
+        watchdog.stop()
         if proc.poll() is None:
-            proc.kill()
+            processes.terminate_tree(proc, grace=2)
+        processes.untrack(proc)
         err_file.close()
+    watchdog.raise_if_stopped()
     if proc.returncode != 0:
         detail = err_path.read_bytes()[-2000:].decode("utf-8", "replace")
         raise AudioError(f"No se pudo extraer el audio: {detail.strip()[-200:]}")

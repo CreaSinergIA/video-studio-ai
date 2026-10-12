@@ -21,17 +21,9 @@ from app.services.native import native_dialogs_supported
 
 
 def _total_memory() -> int | None:
-    try:
-        if sys.platform == "darwin":
-            out = subprocess.run(
-                ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5
-            )
-            return int(out.stdout.strip())
-        if hasattr(os, "sysconf"):
-            return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
-    except (OSError, ValueError, subprocess.SubprocessError):
-        return None
-    return None
+    from app.services.setup_checks import total_memory
+
+    return total_memory()
 
 
 def _cpu_name() -> str:
@@ -41,6 +33,8 @@ def _cpu_name() -> str:
                 ["sysctl", "-n", "machdep.cpu.brand_string"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5,
             )
             if out.stdout.strip():
@@ -196,7 +190,14 @@ def _node_version() -> str | None:
     if not node:
         return None
     try:
-        out = subprocess.run([node, "--version"], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(
+            [node, "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
         return out.stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         return None

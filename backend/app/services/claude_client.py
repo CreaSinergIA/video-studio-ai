@@ -8,8 +8,9 @@ Dos transportes oficiales:
   un directorio vacío y sin variables de entorno que pudieran cambiar la autenticación (se
   eliminan ``ANTHROPIC_API_KEY``/``ANTHROPIC_AUTH_TOKEN`` para no facturar por API sin
   querer). Consume los límites del plan del usuario; el coste que reporta es una estimación.
-- ``api``: Messages API con la clave del usuario guardada en el llavero de macOS. Factura por
-  tokens en la Consola de Anthropic.
+- ``api``: Messages API con la clave del usuario guardada en el llavero del sistema (macOS:
+  llavero; Windows: Administrador de credenciales; ver ``app.platform.credentials``). Factura
+  por tokens en la Consola de Claude.
 
 Claude solo **planifica**: recibe texto e imágenes pequeñas y devuelve JSON validado contra un
 esquema. Nunca ejecuta herramientas ni accede a archivos.
@@ -34,13 +35,12 @@ from typing import Any
 
 from app import edition
 from app.domain.preferences import ClaudePreferences
-from app.platform import processes
+from app.platform import credentials, processes
 from app.services.media_tools import Cancelled
 
 log = logging.getLogger(__name__)
 
 KEYCHAIN_SERVICE = edition.KEYCHAIN_SERVICE  # propio de esta edición: nunca lee otra copia
-KEYCHAIN_ACCOUNT = "anthropic-api-key"
 # Única herramienta que Claude Code añade para la salida estructurada (interna, sin efectos).
 ALLOWED_INTERNAL_TOOLS = {"StructuredOutput"}
 # Variables que podrían cambiar la autenticación o el proveedor del CLI.
@@ -157,6 +157,8 @@ def cli_status(prefs: ClaudePreferences, timeout: float = 20) -> dict[str, Any]:
             [str(cli), "--version"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=clean_env(),
         )
@@ -165,6 +167,8 @@ def cli_status(prefs: ClaudePreferences, timeout: float = 20) -> dict[str, Any]:
             [str(cli), "auth", "status"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             env=clean_env(),
         )
@@ -277,6 +281,8 @@ def run_claude_code(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             **processes.group_kwargs(),  # para poder terminar el árbol completo al cancelar
         )
     except OSError as exc:
@@ -406,70 +412,90 @@ def run_claude_code(
 
 
 def keychain_get() -> str | None:
-    try:
-        out = subprocess.run(
-            [
-                "security",
-                "find-generic-password",
-                "-s",
-                KEYCHAIN_SERVICE,
-                "-a",
-                KEYCHAIN_ACCOUNT,
-                "-w",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    key = out.stdout.strip()
-    return key if out.returncode == 0 and key else None
+    return credentials.store().get()
 
 
 def keychain_has_key() -> bool:
-    """Comprueba si hay clave guardada sin leer el secreto."""
-    try:
-        out = subprocess.run(
-            ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT],
-            capture_output=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return out.returncode == 0
+    """Comprueba si hay clave guardada sin leer el secreto (cuando el sistema lo permite)."""
+    return credentials.store().has()
+
+
+def keychain_label() -> str:
+    return credentials.store().label
 
 
 def keychain_set(key: str) -> None:
-    # La clave viaja por stdin (modo interactivo de `security`), nunca como argumento visible
-    # en la lista de procesos. Su formato ya está validado: sin espacios ni comillas.
-    if not key.replace("-", "").replace("_", "").isalnum():
-        raise ClaudeError("invalid_key", "Formato de clave no válido.")
-    command = f"add-generic-password -U -s {KEYCHAIN_SERVICE} -a {KEYCHAIN_ACCOUNT} -w {key}\n"
     try:
-        out = subprocess.run(
-            ["security", "-i"], input=command, capture_output=True, text=True, timeout=10
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        # Sin la herramienta `security` (p. ej. Windows): error claro en lugar de un 500.
-        raise ClaudeError(
-            "keychain_unavailable", "El llavero del sistema no está disponible en este equipo."
-        ) from exc
-    if out.returncode != 0:
-        raise ClaudeError("keychain", "No se pudo guardar la clave en el llavero de macOS.")
+        credentials.store().set(key)
+    except credentials.CredentialError as exc:
+        raise ClaudeError(exc.code, exc.message) from exc
 
 
 def keychain_delete() -> None:
     try:
-        subprocess.run(
-            ["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT],
-            capture_output=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise ClaudeError(
-            "keychain_unavailable", "El llavero del sistema no está disponible en este equipo."
-        ) from exc
+        credentials.store().delete()
+    except credentials.CredentialError as exc:
+        raise ClaudeError(exc.code, exc.message) from exc
+
+
+# Precios de lista de la API de Anthropic (USD por millón de tokens) para ESTIMAR el coste. La
+# factura real es la de la Consola de Claude (puede variar por descuentos, impuestos o
+# cambios de tarifa). Fuente: documentación de precios de Anthropic, octubre de 2026.
+PRICING_USD_PER_MTOK: dict[str, dict[str, float]] = {
+    "claude-opus-5-5": {
+        "input": 4.0,
+        "output": 20.0,
+        "cache_write": 5.0,  # escritura en caché de 5 min: 1,25 × entrada
+        "cache_read": 0.20,
+    },
+}
+PRICING_AS_OF = "2026-10"
+
+
+def estimate_cost_usd(model: str, usage: dict[str, int | None]) -> float | None:
+    price = PRICING_USD_PER_MTOK.get(model)
+    if price is None:
+        return None
+    total = (
+        (usage.get("input_tokens") or 0) * price["input"]
+        + (usage.get("output_tokens") or 0) * price["output"]
+        + (usage.get("cache_creation_tokens") or 0) * price["cache_write"]
+        + (usage.get("cache_read_tokens") or 0) * price["cache_read"]
+    ) / 1_000_000
+    return round(total, 6)
+
+
+def _api_base_url() -> str | None:
+    # Solo en el entorno de pruebas: servidor local que imita la API (sin red ni cargos).
+    if os.environ.get("VSA_ENV") == "test":
+        return os.environ.get("VSA_TEST_ANTHROPIC_BASE_URL") or None
+    return None
+
+
+def _client(key: str, timeout: float) -> Any:
+    import anthropic
+
+    return anthropic.Anthropic(
+        api_key=key, timeout=timeout, max_retries=0, base_url=_api_base_url()
+    )
+
+
+def verify_key(model: str) -> dict[str, Any]:
+    """Comprueba la clave y el acceso al modelo con la API de modelos: **no genera coste**
+    (no se envía ninguna solicitud al modelo)."""
+    key = keychain_get()
+    if not key:
+        raise ClaudeError("not_authenticated", "No hay una clave de API guardada.")
+    started = time.monotonic()
+    try:
+        info = _client(key, 30).models.retrieve(model)
+    except Exception as exc:
+        raise _api_error(exc) from exc
+    return {
+        "model": getattr(info, "id", model),
+        "display_name": getattr(info, "display_name", None),
+        "duration_ms": int((time.monotonic() - started) * 1000),
+    }
 
 
 def api_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -502,21 +528,52 @@ def _api_error(exc: Exception) -> ClaudeError:
     import anthropic
 
     if isinstance(exc, anthropic.AuthenticationError):
-        return ClaudeError("not_authenticated", "La clave de API no es válida.")
+        return ClaudeError(
+            "not_authenticated",
+            "La clave de API no es válida o fue revocada. Revísala en la Consola de Claude "
+            "(platform.claude.com → API Keys) y guárdala de nuevo.",
+        )
     if isinstance(exc, anthropic.PermissionDeniedError):
-        return ClaudeError("forbidden", f"Permiso denegado: {exc.message}")
+        return ClaudeError(
+            "forbidden",
+            f"La clave no tiene permiso para esta operación o este modelo: {exc.message}",
+        )
     if isinstance(exc, anthropic.NotFoundError):
-        return ClaudeError("model_not_found", f"Modelo no disponible: {exc.message}")
+        return ClaudeError(
+            "model_not_found",
+            f"Tu cuenta no tiene acceso al modelo o no existe: {exc.message}",
+        )
     if isinstance(exc, anthropic.RateLimitError):
-        return ClaudeError("rate_limited", "Límite de la API alcanzado.", retryable=True)
+        return ClaudeError(
+            "rate_limited",
+            "Se alcanzó el límite de tu cuenta de la API (solicitudes o tokens por minuto). "
+            "Espera un momento; los límites dependen del nivel de tu organización en la Consola.",
+            retryable=True,
+        )
+    if isinstance(exc, anthropic.BadRequestError) and (
+        "credit" in str(exc.message).lower() or "billing" in str(exc.message).lower()
+    ):
+        return ClaudeError(
+            "no_credit",
+            "Tu cuenta de Anthropic no tiene saldo o facturación activa. Añade crédito en la "
+            "Consola (platform.claude.com → Billing).",
+        )
     if isinstance(exc, anthropic.APIStatusError):
+        if exc.status_code == 529:
+            return ClaudeError(
+                "overloaded", "Claude está saturado en este momento.", retryable=True
+            )
         return ClaudeError(
             "server_error",
-            f"Error de la API ({exc.status_code}).",
+            f"Error de la API ({exc.status_code}): {str(exc.message)[:200]}",
             retryable=exc.status_code >= 500,
         )
     if isinstance(exc, anthropic.APIConnectionError):
-        return ClaudeError("network", "Sin conexión con la API de Anthropic.", retryable=True)
+        return ClaudeError(
+            "network",
+            "Sin conexión con la API de Anthropic. Comprueba tu conexión a internet.",
+            retryable=True,
+        )
     return ClaudeError("claude_error", f"Error de la API: {type(exc).__name__}")
 
 
@@ -530,12 +587,11 @@ def run_api(
     on_event: Callable[[str], None] | None = None,
     model: str | None = None,
 ) -> ClaudeResult:
-    import anthropic
 
     key = keychain_get()
     if not key:
         raise ClaudeError("not_authenticated", "No hay una clave de API guardada.")
-    client = anthropic.Anthropic(api_key=key, timeout=prefs.timeout_seconds, max_retries=0)
+    client = _client(key, prefs.timeout_seconds)
     started = time.monotonic()
     text = ""
     stop = threading.Event()
@@ -545,7 +601,7 @@ def run_api(
             model=model or prefs.model,
             max_tokens=32000,
             system=system,
-            messages=[{"role": "user", "content": blocks}],  # type: ignore[typeddict-item]
+            messages=[{"role": "user", "content": blocks}],
             extra_body={
                 "output_config": {
                     "effort": prefs.effort,
@@ -592,16 +648,18 @@ def run_api(
     except json.JSONDecodeError as exc:
         raise ClaudeError("invalid_output", "La respuesta no es JSON válido.") from exc
     usage = final.usage
+    tokens: dict[str, int | None] = {
+        "input_tokens": usage.input_tokens,
+        "output_tokens": usage.output_tokens,
+        "cache_creation_tokens": usage.cache_creation_input_tokens,
+        "cache_read_tokens": usage.cache_read_input_tokens,
+    }
     return ClaudeResult(
         data=data,
         model_reported=final.model,
-        usage={
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-            "cache_creation_tokens": usage.cache_creation_input_tokens,
-            "cache_read_tokens": usage.cache_read_input_tokens,
-        },
-        cost_estimate_usd=None,  # la API no informa del coste; consultar la Consola
+        usage=tokens,
+        # Estimación a precio de lista; la factura real está en la Consola de Claude.
+        cost_estimate_usd=estimate_cost_usd(final.model or prefs.model, tokens),
         duration_ms=int((time.monotonic() - started) * 1000),
         rate_limit=None,
         billing="api",

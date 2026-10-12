@@ -17,7 +17,7 @@ from app import edition
 from app.platform import paths
 
 APP_NAME = "Video Studio AI"
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.6.0"
 
 DEFAULT_PORT = edition.DEFAULT_PORT
 
@@ -71,10 +71,17 @@ class Settings:
         return ["127.0.0.1", "localhost", "::1", "[::1]", *self.extra_allowed_hosts]
 
 
-def _resolve_binary(name: str, env_var: str) -> str:
+def _resolve_binary(name: str, env_var: str, home: Path | None = None) -> str:
     explicit = os.environ.get(env_var)
     if explicit:
         return explicit
+    # Copia portátil instalada por el instalador (versión fijada y verificada).
+    if home is not None:
+        from app.platform import tools
+
+        portable = tools.installed_executable(home, "ffmpeg", name)
+        if portable is not None:
+            return str(portable)
     found = shutil.which(name)
     if found:
         return found
@@ -110,8 +117,8 @@ def load_settings() -> Settings:
         home=home,
         host=host,
         port=int(os.environ.get("VSA_PORT", DEFAULT_PORT)),
-        ffmpeg=_resolve_binary("ffmpeg", "VSA_FFMPEG"),
-        ffprobe=_resolve_binary("ffprobe", "VSA_FFPROBE"),
+        ffmpeg=_resolve_binary("ffmpeg", "VSA_FFMPEG", home),
+        ffprobe=_resolve_binary("ffprobe", "VSA_FFPROBE", home),
         frontend_dist=frontend_dist,
         dev_origins=origins,
         extra_allowed_hosts=extra_hosts,

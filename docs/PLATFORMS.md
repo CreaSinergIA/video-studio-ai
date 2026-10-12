@@ -1,42 +1,41 @@
 # Compatibilidad: macOS y Windows
 
-> **Estado:**
-> - **macOS (Apple Silicon):** validado.
-> - **macOS Intel:** no validado (no tendría transcripción local).
-> - **Windows:** NO validado. La arquitectura está preparada y los componentes que requieren adaptación están identificados.
-> - No se afirma compatibilidad con Windows hasta probarla en ese sistema.
+> **Estado (CE Fase 2):**
+> - **macOS con Apple Silicon:** validado — instalación nueva, pruebas automáticas, E2E y flujo completo de punta a punta.
+> - **Windows 10/11 x64:** **implementado; pendiente de validar en un PC real.** No se declara compatible hasta completar [WINDOWS-VALIDATION.md](WINDOWS-VALIDATION.md).
+> - **Mac Intel y Windows en ARM:** no compatibles (ver [REQUIREMENTS.md](REQUIREMENTS.md)).
+> - **Linux:** sin validar.
 
-El diagnóstico de cada equipo se muestra en **Ajustes → Acerca de** (`app/platform`).
+El diagnóstico de cada equipo aparece en **Ajustes → Acerca de**, en la primera configuración y con `doctor`.
 
 ## Matriz de componentes
-| Componente | macOS (Apple Silicon) | Windows | Adaptador / estado |
+| Componente | macOS (Apple Silicon) | Windows x64 | Dónde |
 |---|---|---|---|
-| Backend (Python 3.12 + FastAPI + SQLite) | ✅ | Previsto (portable) | — |
-| Panel (React, navegador local) | ✅ | Previsto (portable) | — |
-| Rutas de datos | `~/Library/Application Support/VideoStudioAI-Community` | `%LOCALAPPDATA%\VideoStudioAI-Community` | `app/platform/paths.py` ✅ (sin validar en Windows) |
-| Procesos (cancelar render o Claude) | grupo de procesos + señales POSIX ✅ | grupo de procesos + `taskkill /T` | `app/platform/processes.py` (sin validar en Windows) |
-| Transcripción local | MLX Whisper ✅ | **faster-whisper** (CPU INT8; CUDA opcional) o **whisper.cpp** (CPU, CUDA o Vulkan) | `app/platform/transcription.py`: motor de Windows **pendiente** |
-| Codificación por hardware | VideoToolbox ✅ | NVENC / Quick Sync / AMF detectados, **no usados** hasta validarlos; se usa software (libx264/libx265) | `app/platform/encoders.py` |
-| FFmpeg / ffprobe | Homebrew u oficial | Compilación oficial de Windows (p. ej. BtbN LGPL), instalada por el usuario o por el instalador | Detección actual: `VSA_FFMPEG` / PATH |
-| Análisis visual (OpenCV + YuNet) | ✅ | Previsto (ruedas oficiales de OpenCV) | — |
-| Remotion + navegador de render | ✅ (Chrome for Testing mac-arm64) | Previsto (Chrome for Testing win64) | `services/render_engine.py`: falta la plataforma win64 en la descarga |
-| Llavero (clave de API) | `security` de macOS ✅ | Administrador de credenciales de Windows | **Pendiente** (p. ej. `keyring`) |
-| Selector de carpetas nativo | AppleScript ✅ | Diálogo de Windows | Pendiente (se puede escribir la ruta a mano) |
-| Mostrar en Finder / abrir archivo | `open -R` / `open` ✅ | `explorer /select,` / `os.startfile` | Implementado, sin validar |
-| Almacenamiento externo | `/Volumes/…` (exFAT con archivos AppleDouble) ✅ | Letras de unidad (`D:\…`) | `services/storage.py`: detección de volúmenes por revisar |
-| Lanzador | `./videostudio` (bash) ✅ | `videostudio.ps1` o `.cmd` | **Pendiente** |
-| Puerto local | 8775, solo 127.0.0.1 ✅ | Igual; posible aviso del firewall | — |
-| Pruebas E2E | WebKit + Chromium ✅ | Chromium | Los fixtures usan `say` (voces de macOS): alternativa pendiente |
+| Lanzador | `videostudio` (bash), `.command`, app en `~/Applications` ✅ | `videostudio.ps1` (PowerShell 5.1+), `.cmd`, accesos en Escritorio y menú Inicio 🟡 | `app/launcher.py` (común), `app/shortcuts.py` |
+| Instalador guiado y reanudable | ✅ | 🟡 | `app/installer.py` (común) |
+| Python 3.12 | uv 0.12.18 (portátil si falta) ✅ | uv 0.12.18 (portátil) 🟡 | lanzadores |
+| Node.js | el del sistema ≥ 20.19 o 24 LTS portátil ✅ | ídem (zip win-x64) 🟡 | `app/platform/tools.py` |
+| FFmpeg / ffprobe | el del sistema o 9.0.2 portátil (Martin Riedl, firmado) ✅ | el del sistema o 9.0.2 «essentials» (Gyan) 🟡 | `app/platform/tools.py`, `config.py` |
+| Transcripción | **MLX Whisper** (Metal) ✅ · faster-whisper disponible ✅ | **faster-whisper** CPU INT8; CUDA opcional con vuelta a CPU 🟡 (motor validado en macOS) | `app/platform/transcription.py`, `workers/transcribe_worker.py` |
+| Clave de API | Llavero (`security`) ✅ | Administrador de credenciales (`keyring` → WinVault) 🟡 | `app/platform/credentials.py` |
+| Remotion + navegador de render | Chrome Headless Shell mac-arm64 ✅ | win64 (SHA-256 fijado), entorno con `SYSTEMROOT`, `TEMP`… 🟡 | `services/render_engine.py` |
+| Procesos | grupos POSIX + vigilante del árbol + registro de hijos ✅ | grupos + `taskkill /T` + vigilante del árbol + *Job Object* 🟡 | `app/platform/processes.py` |
+| Instancia única, puertos, cierre | ✅ | 🟡 (misma lógica, bloqueo con `msvcrt`) | `app/lifecycle.py`, `app/launcher.py` |
+| Rutas de datos | `~/Library/Application Support/VideoStudioAI-Community` ✅ | `%LOCALAPPDATA%\VideoStudioAI-Community` 🟡 | `app/platform/paths.py` |
+| Almacenamiento externo | `/Volumes/…` (incluido exFAT) ✅ | letras de unidad (`D:\…`) 🟡 | `services/storage.py` |
+| Originales de solo lectura | ✅ | atributo de solo lectura quitado al borrar 🟡 | `services/storage.py` |
+| Texto y codificación | UTF-8 ✅ | UTF-8 explícito en archivos y procesos 🟡 | todo el backend |
+| Selector de carpetas y archivos | AppleScript (argumentos, sin interpolar) ✅ | Windows Forms (PowerShell) 🟡 | `services/native.py` |
+| Mostrar en Finder / Explorador | ✅ | `explorer /select,` 🟡 | `services/native.py` |
+| Codificación por hardware | VideoToolbox ✅ | NVENC / Quick Sync / AMF detectados, **no usados**: software (libx264/libx265) | `app/platform/encoders.py` |
+| Puerto local | 8775 (o el siguiente libre), solo 127.0.0.1 ✅ | igual 🟡 | — |
+| Pruebas E2E | WebKit + Chromium ✅ | Chromium; voz sintética SAPI en `scripts/smoke_e2e.py` 🟡 | `frontend/e2e`, `scripts/` |
 
-## Recomendaciones para Windows (Fase 2)
-1. **Transcripción:**
-   - faster-whisper en CPU (INT8) por defecto, que funciona sin GPU.
-   - CUDA opcional solo si hay una GPU NVIDIA, con las bibliotecas descargadas aparte.
-   - Evaluar whisper.cpp con Vulkan para GPU de cualquier fabricante.
-   - **No exigir GPU NVIDIA.**
-2. **FFmpeg:** documentar la instalación de una compilación oficial LGPL o GPL. No incluirla sin revisar sus obligaciones de licencia.
-3. **Navegador de render:** añadir la plataforma `win64` a la descarga verificada.
-4. **Llavero:** Administrador de credenciales de Windows.
-5. **Procesos y rutas:** validar `taskkill /T`, rutas largas, permisos y antivirus.
-6. **Lanzador y empaquetado:** PowerShell; evaluar un instalador.
-7. **Pruebas:** ejecutar el backend, el panel y la E2E con Chromium en Windows 11 (CPU sola y con NVIDIA).
+✅ validado · 🟡 implementado, pendiente de validar en Windows real
+
+## Decisiones
+1. **faster-whisper** en lugar de whisper.cpp para Windows: se instala con las mismas dependencias de Python (sin compilar ni descargar binarios por plataforma), funciona en la CPU con INT8, usa CUDA si existe y ofrece la misma alineación por palabra (DTW sobre la atención cruzada) que MLX. whisper.cpp con Vulkan queda como alternativa futura para GPU AMD/Intel.
+2. **Sin WSL ni Docker:** no aportan nada aquí (todo es Python, Node y FFmpeg nativos) y complicarían la instalación.
+3. **Herramientas portátiles** en la carpeta de datos en lugar de instaladores globales: no requieren administrador y se eliminan con la carpeta.
+4. **Exportación por software en Windows** hasta validar NVENC/Quick Sync/AMF: es más lenta pero funciona en cualquier equipo.
+5. **Mac en Apple Silicon sigue con MLX:** es varias veces más rápido que faster-whisper en ese hardware.

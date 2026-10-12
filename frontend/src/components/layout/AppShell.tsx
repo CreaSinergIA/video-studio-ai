@@ -1,16 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Clapperboard, HardDrive, LayoutGrid, Settings2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tooltip } from '@/components/ui/feedback'
-import { keys, useJobs, useSettings, useStorageStatus } from '@/hooks/queries'
+import { keys, useJobs, useSettings, useSetupStatus, useStorageStatus } from '@/hooks/queries'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { loadSubtitleFonts } from '@/lib/subtitleState'
-import { formatBytes } from '@/lib/format'
+import { formatBytes, FILE_MANAGER } from '@/lib/format'
 import { ImportTray } from './ImportTray'
 import { HealthBanner } from './HealthBanner'
+import { SessionGate } from './SessionGate'
 import { StorageBanner } from './StorageBanner'
 
 function Logo() {
@@ -114,7 +115,7 @@ function JobWatcher() {
           const exportId = typeof job.result?.export_id === 'string' ? job.result.export_id : null
           toast.success('Exportación terminada y verificada', {
             description: 'También disponible en «Exportar» del proyecto.',
-            action: exportId ? { label: 'Mostrar en Finder', onClick: () => void api.revealExport(exportId) } : undefined,
+            action: exportId ? { label: `Mostrar en ${FILE_MANAGER}`, onClick: () => void api.revealExport(exportId) } : undefined,
             duration: 10_000,
           })
         } else if (job.status === 'succeeded' && job.kind === 'scene_revise') {
@@ -141,8 +142,24 @@ function JobWatcher() {
       qc.invalidateQueries({ queryKey: ['animations'] })
       qc.invalidateQueries({ queryKey: ['plan'] })
       qc.invalidateQueries({ queryKey: keys.asrModels })
+      qc.invalidateQueries({ queryKey: keys.engine })
+      qc.invalidateQueries({ queryKey: keys.setup })
     }
   }, [jobs, qc])
+  return null
+}
+
+/** Primera ejecución: lleva una sola vez al asistente si aún no se completó. */
+function SetupRedirect() {
+  const { data } = useSetupStatus()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const done = useRef(false)
+  useEffect(() => {
+    if (!data || done.current) return
+    done.current = true
+    if (!data.completed_at && location.pathname !== '/setup') navigate('/setup', { replace: true })
+  }, [data, location.pathname, navigate])
   return null
 }
 
@@ -152,6 +169,8 @@ export function AppShell() {
       <PreferenceApplier />
       <SubtitleFontLoader />
       <JobWatcher />
+      <SetupRedirect />
+      <SessionGate />
       <aside className="flex w-[76px] shrink-0 flex-col items-center gap-2 border-r border-line bg-surface-1/60 py-4">
         <NavLink to="/" aria-label="Video Studio AI — Biblioteca" className="mb-4">
           <Logo />

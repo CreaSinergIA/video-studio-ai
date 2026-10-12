@@ -48,7 +48,7 @@ import { FlowSteps, type FlowStep } from '@/components/editor/FlowSteps'
 import { TYPE_META, fmtT } from '@/lib/plan'
 import { ApiError, CLIENT_HEADER, api } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { formatDuration, formatFps, formatResolution, ORIENTATION_LABEL } from '@/lib/format'
+import { formatDuration, formatFps, formatResolution, ORIENTATION_LABEL, FILE_MANAGER } from '@/lib/format'
 import type { EditConfig, EditorState, ProjectDetail } from '@/lib/types'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -599,7 +599,7 @@ function EditorView({ project }: { project: ProjectDetail }) {
               items={[
                 { label: 'Guardar configuración como preset…', icon: <BookmarkPlus />, onSelect: () => setSavePresetOpen(true) },
                 {
-                  label: 'Mostrar en Finder',
+                  label: `Mostrar en ${FILE_MANAGER}`,
                   icon: <FolderSearch />,
                   disabled: !asset || !project.storage_available,
                   onSelect: () => asset && void api.reveal(asset.id),

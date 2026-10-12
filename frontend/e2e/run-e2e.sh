@@ -45,6 +45,12 @@ printf '#!/bin/sh\nexec "%s/.venv/bin/python" "%s/tests/fake_claude.py" "$@"\n' 
 chmod +x "$BASE/fake-claude"
 export VSA_E2E_FAKE_CLAUDE="$BASE/fake-claude"
 (cd ../backend && uv sync --quiet)
+# Community Edition: API de Anthropic SIMULADA (clave propia sin red ni cargos).
+FAKE_API_PORT="${VSA_E2E_FAKE_API_PORT:-8797}"
+"$BACKEND/.venv/bin/python" "$BACKEND/tests/fake_anthropic.py" --port "$FAKE_API_PORT" >/dev/null 2>&1 &
+FAKE_API_PID=$!
+trap 'kill $FAKE_API_PID 2>/dev/null || true' EXIT
+export VSA_E2E_FAKE_API="http://127.0.0.1:$FAKE_API_PORT"
 # Fase 4: el navegador de render ya instalado por la app se enlaza (solo lectura) al entorno
 # aislado; sin él, las pruebas de la Fase 4 se omiten.
 ENGINES="${VSA_E2E_ENGINES:-$HOME/Library/Application Support/VideoStudioAI-Community/engines}"

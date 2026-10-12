@@ -54,3 +54,7 @@ export async function api<T>(page: Page, url: string): Promise<T> {
   expect(res.ok()).toBeTruthy()
   return (await res.json()) as T
 }
+
+/** Token del servidor de pruebas (playwright.config.ts lo fija con VSA_SESSION_TOKEN). */
+export const E2E_TOKEN = 'token-e2e-0123456789abcdef0123456789abcdef'
+export const WRITE = { 'x-vsa-client': '1' }

@@ -35,7 +35,9 @@ PATTERNS = [
     (re.compile(r"[A-Za-z]:\\\\{1,2}Users\\\\{1,2}(?!usuario|<)[^\\\s\"']+"), "ruta de usuario de Windows"),
     (re.compile(r"/Volumes/(?!MiDisco\b|Disco\b|__vsa_|<|…)[^/\s\"'`]+"), "ruta de un volumen externo"),
     (re.compile(r"[A-Za-z0-9._%+-]+@(?!example\.|users\.noreply\.github\.com)[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "correo electrónico"),
-    (re.compile(r"sk-ant-[A-Za-z0-9_-]{16,}"), "clave de API de Anthropic"),
+    # «sk-ant-test-…» está reservado a claves ficticias de las pruebas (ninguna clave real de
+    # Anthropic empieza así: api03, admin01, oat01…). Cualquier otra forma se bloquea.
+    (re.compile(r"sk-ant-(?!test-)[A-Za-z0-9_-]{16,}"), "clave de API de Anthropic"),
     (re.compile(r"(ghp|gho|ghu|ghs|github_pat)_[A-Za-z0-9_]{20,}"), "token de GitHub"),
     (re.compile(r"AKIA[0-9A-Z]{16}"), "clave de AWS"),
     (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "clave privada"),

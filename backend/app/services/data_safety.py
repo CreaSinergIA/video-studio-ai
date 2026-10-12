@@ -64,7 +64,7 @@ def requested_kind(home: Path) -> EnvKind:
 
 def read_marker(home: Path) -> dict[str, str] | None:
     try:
-        data = json.loads((home / MARKER).read_text())
+        data = json.loads((home / MARKER).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if isinstance(data, dict) and data.get("kind") in ("user", "test"):
@@ -97,7 +97,8 @@ def ensure_environment(home: Path, version: str) -> EnvKind:
             json.dumps(
                 {"kind": kind, "created_at": datetime.now(UTC).isoformat(), "app_version": version},
                 indent=1,
-            )
+            ),
+            encoding="utf-8",
         )
     return kind
 

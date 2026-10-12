@@ -9,6 +9,8 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
+from app import limits
+
 ALLOWED_EXTENSIONS = {".mp4": "mp4", ".mov": "mov"}
 ISO_BMFF_BOXES = {b"ftyp", b"moov", b"mdat", b"wide", b"free", b"skip", b"pnot", b"uuid"}
 
@@ -176,7 +178,8 @@ def run_ffprobe(ffprobe: str, path: Path, timeout: float = 60) -> dict[str, Any]
         proc = subprocess.run(cmd, capture_output=True, timeout=timeout, check=False)
     except FileNotFoundError as exc:
         raise MediaValidationError(
-            "ffprobe_missing", "No se encontró ffprobe. Instala FFmpeg (brew install ffmpeg)."
+            "ffprobe_missing",
+            "No se encontró ffprobe. Ejecuta el instalador de Video Studio AI de nuevo.",
         ) from exc
     except subprocess.TimeoutExpired as exc:
         raise MediaValidationError(
@@ -227,10 +230,22 @@ def parse_probe(data: dict[str, Any], filename: str) -> MediaInfo:
     height = _int(video.get("height")) or 0
     if width <= 0 or height <= 0:
         raise MediaValidationError("invalid_dimensions", "No se pudo leer la resolución del video.")
+    if max(width, height) > limits.MAX_LONG_SIDE or width * height > limits.MAX_PIXELS:
+        raise MediaValidationError(
+            "too_large",
+            f"La resolución {width}×{height} supera el máximo admitido (8K). Reduce el video "
+            "antes de importarlo.",
+        )
 
     duration = _float(fmt.get("duration")) or _float(video.get("duration")) or 0.0
     if duration <= 0:
         raise MediaValidationError("invalid_duration", "No se pudo leer la duración del video.")
+    if duration > limits.MAX_DURATION_SECONDS:
+        raise MediaValidationError(
+            "too_long",
+            f"El video dura {duration / 3600:.1f} h; el máximo admitido es "
+            f"{limits.MAX_DURATION_SECONDS / 3600:.0f} h. Divídelo en partes.",
+        )
 
     rotation = _rotation(video)
     display_w, display_h = (height, width) if rotation in (90, 270) else (width, height)
@@ -243,6 +258,10 @@ def parse_probe(data: dict[str, Any], filename: str) -> MediaInfo:
 
     rate = _rate(video.get("avg_frame_rate")) or _rate(video.get("r_frame_rate")) or Fraction(30)
     rate = rate.limit_denominator(1001)
+    if float(rate) > limits.MAX_FPS:
+        raise MediaValidationError(
+            "too_many_fps", f"{float(rate):.0f} fotogramas por segundo superan el máximo admitido."
+        )
 
     bit_depth = _int(video.get("bits_per_raw_sample"))
     pix_fmt = video.get("pix_fmt")

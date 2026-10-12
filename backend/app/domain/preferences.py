@@ -34,7 +34,10 @@ class EditorState(BaseModel):
     settings_tab: str = "style"
 
 
-TranscriptionModelId = Literal["large-v3-turbo", "large-v3-turbo-q4"]
+# MLX (Apple Silicon) y faster-whisper (Windows, Linux, Mac Intel); ver services/asr_models.
+TranscriptionModelId = Literal[
+    "large-v3-turbo", "large-v3-turbo-q4", "fw-large-v3-turbo", "fw-small"
+]
 TranscriptionLanguage = Literal["auto", "es", "en", "pt", "fr", "it", "de", "ca"]
 
 

@@ -1,4 +1,7 @@
-"""Transcripción local: orquesta audio → VAD → MLX Whisper (subproceso) → refinamiento.
+"""Transcripción local: orquesta audio → VAD → Whisper (subproceso) → refinamiento.
+
+Motor según la plataforma: MLX Whisper (Apple Silicon) o faster-whisper (Windows, Linux, Mac
+Intel); ver ``app.platform.transcription``.
 
 Caché: cada transcripción ASR guarda un ``params_hash`` (huella del original + modelo +
 idioma + versión del proceso). Repetir con los mismos parámetros reutiliza el resultado sin
@@ -28,6 +31,7 @@ from app.config import get_settings
 from app.db import BACKEND_DIR, session_scope
 from app.domain.preferences import AnalysisPreferences
 from app.models import MediaAsset, Transcript, new_id
+from app.platform import processes
 from app.services import asr_models, audio
 from app.services.media_tools import Cancelled
 from app.services.storage import atomic_write_json, resolve_inside
@@ -35,7 +39,6 @@ from app.services.storage import atomic_write_json, resolve_inside
 log = logging.getLogger(__name__)
 
 PIPELINE_VERSION = "asr-2"  # cambiarla invalida la caché de transcripciones
-ENGINE = "mlx-whisper"
 
 
 class TranscriptionError(Exception):
@@ -74,17 +77,22 @@ def run_worker(
     """Ejecuta el proceso de reconocimiento y devuelve su resultado."""
     tmp = Path(request["out"]).parent
     req_path = tmp / "request.json"
-    req_path.write_text(json.dumps(request, ensure_ascii=False))
+    req_path.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
     proc = subprocess.Popen(
         [sys.executable, "-m", "app.workers.transcribe_worker", str(req_path)],
         cwd=BACKEND_DIR,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        env={**_env(), "HF_HUB_OFFLINE": "1"},
+        encoding="utf-8",
+        errors="replace",
+        env={**_env(), "HF_HUB_OFFLINE": "1", "PYTHONIOENCODING": "utf-8"},
+        **processes.group_kwargs(),
     )
+    processes.track(proc)
     error: str | None = None
     stderr_tail: list[str] = []
+    device: dict[str, Any] = {}
 
     def _drain() -> None:
         assert proc.stderr is not None
@@ -98,7 +106,7 @@ def run_worker(
     def _watch() -> None:
         while proc.poll() is None:
             if cancel.is_set():
-                proc.kill()
+                processes.terminate_tree(proc, grace=2)
                 return
             time.sleep(0.2)
 
@@ -112,14 +120,20 @@ def run_worker(
                 on_progress(float(msg["value"]))
             elif msg.get("type") == "error":
                 error = msg.get("message")
+            elif msg.get("type") == "device":
+                device.update(msg)
     proc.wait()
+    processes.untrack(proc)
     drain.join(timeout=2)
     if cancel.is_set():
         raise Cancelled()
     if proc.returncode != 0:
         detail = error or (stderr_tail[-1] if stderr_tail else f"código {proc.returncode}")
         raise TranscriptionError(f"El motor de transcripción falló: {detail}")
-    return json.loads(Path(request["out"]).read_text())
+    result: dict[str, Any] = json.loads(Path(request["out"]).read_text(encoding="utf-8"))
+    if device:
+        result["device"] = {k: v for k, v in device.items() if k != "type"}
+    return result
 
 
 def _env() -> dict[str, str]:
@@ -221,7 +235,9 @@ def transcribe_asset(
         tid = _save(asset, root, phash, prefs, "no_audio", [], base_stats, None)
         return {"transcript_id": tid, "reused": False, "status": "no_audio"}
 
+    spec = asr_models.require_usable(prefs.transcription_model)
     model_path = asr_models.installed_path(prefs.transcription_model)
+    base_stats["engine"] = spec.engine
     src = resolve_inside(root, asset.file_rel)
     tmp = work_dir()
     try:
@@ -246,6 +262,7 @@ def transcribe_asset(
         result = run_worker(
             {
                 "mode": "transcribe",
+                "engine": spec.engine,
                 "wav": str(wav),
                 "model_dir": str(model_path),
                 "language": prefs.language,
@@ -268,6 +285,7 @@ def transcribe_asset(
                 "segments": len(segments),
                 "asr_seconds": round(elapsed, 2),
                 "realtime_factor": round(duration / elapsed, 2) if elapsed else None,
+                **({"device": result["device"]} if result.get("device") else {}),
             }
         )
         status = "ready" if segments else "no_speech"
@@ -300,7 +318,7 @@ def _save(
         kind="asr",
         is_active=True,
         status=status,
-        engine=ENGINE,
+        engine=asr_models.get_spec(prefs.transcription_model).engine,
         model=prefs.transcription_model,
         language=language,
         params_hash=phash,

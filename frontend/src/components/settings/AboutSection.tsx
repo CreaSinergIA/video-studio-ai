@@ -1,10 +1,52 @@
-import { Info } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { Info, Power, Wand2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/Button'
 import { Badge, Section } from '@/components/ui/feedback'
-import { useSystemInfo } from '@/hooks/queries'
+import { keys, useSystemInfo } from '@/hooks/queries'
+import { ApiError, api } from '@/lib/api'
+
+/** Cierre ordenado del servidor local (también lo hace el lanzador con «Cerrar»). */
+function CloseApp() {
+  const [closing, setClosing] = useState(false)
+  const [closed, setClosed] = useState(false)
+  if (closed)
+    return (
+      <p className="text-[13px] text-fg-muted" role="status">
+        Video Studio AI se ha cerrado. Puedes cerrar esta pestaña; para volver, usa el lanzador o el acceso directo.
+      </p>
+    )
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      icon={<Power className="size-3.5" />}
+      loading={closing}
+      onClick={async () => {
+        if (!window.confirm('¿Cerrar Video Studio AI? Las tareas en curso se cancelarán; tus proyectos se conservan.')) return
+        setClosing(true)
+        try {
+          await api.shutdown()
+          setClosed(true)
+        } catch (err) {
+          toast.error('No se pudo cerrar', { description: err instanceof ApiError ? err.message : String(err) })
+        } finally {
+          setClosing(false)
+        }
+      }}
+    >
+      Cerrar Video Studio AI
+    </Button>
+  )
+}
 
 /** Acerca de: edición, versión, atribución, licencias de terceros y diagnóstico de plataforma. */
 export function AboutSection() {
   const { data } = useSystemInfo()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
   const p = data?.platform
   return (
     <Section title="Acerca de" description="Información del producto, licencias y compatibilidad de este equipo.">
@@ -21,6 +63,21 @@ export function AboutSection() {
               Gratuito y sin marcas de agua: nada de esta información se añade a tus videos, vistas previas ni archivos exportados.
             </p>
           </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Wand2 className="size-3.5" />}
+            onClick={async () => {
+              await api.completeSetup(false)
+              await qc.invalidateQueries({ queryKey: keys.setup })
+              navigate('/setup')
+            }}
+          >
+            Repetir la primera configuración
+          </Button>
+          <CloseApp />
         </div>
         <div className="space-y-2 text-xs leading-relaxed text-fg-muted">
           <p>

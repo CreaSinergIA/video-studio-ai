@@ -1,4 +1,10 @@
-"""Catálogo y gestión de modelos locales de transcripción (MLX Whisper).
+"""Catálogo y gestión de modelos locales de transcripción.
+
+Dos motores (ver ``app.platform.transcription``):
+
+- ``mlx-whisper``: Apple Silicon (Metal). Modelos ``mlx-community``.
+- ``faster-whisper``: Windows, Linux y Mac Intel (CPU INT8; CUDA opcional). Modelos
+  CTranslate2 (licencia MIT).
 
 - Los modelos se descargan **solo** por acción explícita del usuario (botón en Ajustes).
 - Fuente: Hugging Face (organización ``mlx-community``), revisión fijada por commit.
@@ -24,6 +30,7 @@ from threading import Event
 from typing import Any
 
 from app.config import get_settings
+from app.platform import transcription as transcription_engines
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +54,8 @@ class ModelSpec:
     revision: str
     files: tuple[ModelFile, ...]
     recommended: bool = False
+    engine: str = "mlx-whisper"
+    license: str | None = None
 
     @property
     def size_bytes(self) -> int:
@@ -100,6 +109,83 @@ CATALOG: dict[str, ModelSpec] = {
             ),
         ),
     ),
+    # faster-whisper (CTranslate2): Windows, Linux y Mac Intel. Sin GPU usa INT8 en la CPU.
+    "fw-large-v3-turbo": ModelSpec(
+        id="fw-large-v3-turbo",
+        name="Whisper large-v3-turbo (faster-whisper)",
+        description=(
+            "Recomendado. La misma precisión que en Mac, en la CPU (INT8) sin necesidad de GPU; "
+            "con una GPU NVIDIA y CUDA se acelera sola. En una CPU moderna de 8 núcleos tarda "
+            "aproximadamente lo mismo que dura el video. Usa ~2 GB de memoria."
+        ),
+        repo="mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+        revision="0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+        files=(
+            ModelFile(
+                "config.json",
+                2263,
+                "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+            ),
+            ModelFile(
+                "model.bin",
+                1617884929,
+                "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+            ),
+            ModelFile(
+                "preprocessor_config.json",
+                340,
+                "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+            ),
+            ModelFile(
+                "tokenizer.json",
+                2710337,
+                "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+            ),
+            ModelFile(
+                "vocabulary.json",
+                1068114,
+                "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+            ),
+        ),
+        recommended=True,
+        engine="faster-whisper",
+        license="MIT",
+    ),
+    "fw-small": ModelSpec(
+        id="fw-small",
+        name="Whisper small (faster-whisper)",
+        description=(
+            "Ligero para equipos modestos: unas 3–4 veces más rápido que large-v3-turbo en la "
+            "CPU y ~0,5 GB, con menos precisión (más errores en nombres propios y audio "
+            "difícil)."
+        ),
+        repo="Systran/faster-whisper-small",
+        revision="536b0662742c02347bc0e980a01041f333bce120",
+        files=(
+            ModelFile(
+                "config.json",
+                2370,
+                "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+            ),
+            ModelFile(
+                "model.bin",
+                483546902,
+                "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+            ),
+            ModelFile(
+                "tokenizer.json",
+                2203239,
+                "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+            ),
+            ModelFile(
+                "vocabulary.txt",
+                459861,
+                "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+            ),
+        ),
+        engine="faster-whisper",
+        license="MIT",
+    ),
 }
 
 
@@ -127,10 +213,40 @@ def get_spec(model_id: str) -> ModelSpec:
 
 
 def platform_supported() -> bool:
-    import platform
-    import sys
+    """Hay al menos un motor de transcripción local disponible en este equipo."""
+    return transcription_engines.active() is not None
 
-    return sys.platform == "darwin" and platform.machine() == "arm64"
+
+def engine_available(engine: str) -> bool:
+    return any(e.id == engine and e.available for e in transcription_engines.engines())
+
+
+def available_ids() -> list[str]:
+    """Modelos utilizables en este equipo (los de los motores disponibles)."""
+    return [mid for mid, spec in CATALOG.items() if engine_available(spec.engine)]
+
+
+def default_model_id() -> str:
+    """Modelo recomendado del motor preferido de la plataforma."""
+    engine = transcription_engines.active()
+    if engine is not None:
+        for mid, spec in CATALOG.items():
+            if spec.engine == engine.id and spec.recommended:
+                return mid
+    return "large-v3-turbo"
+
+
+def require_usable(model_id: str) -> ModelSpec:
+    spec = get_spec(model_id)
+    if not engine_available(spec.engine):
+        alt = default_model_id()
+        raise ModelError(
+            "engine_unavailable",
+            f"El modelo «{spec.name}» usa un motor que no está disponible en este equipo. "
+            f"Elige otro en Ajustes → Transcripción (recomendado: {get_spec(alt).name}).",
+            409,
+        )
+    return spec
 
 
 def is_installed(model_id: str) -> bool:
@@ -159,7 +275,7 @@ def describe(model_id: str) -> dict[str, Any]:
     spec = get_spec(model_id)
     manifest: dict[str, Any] = {}
     with contextlib.suppress(OSError, ValueError):
-        manifest = json.loads((model_dir(model_id) / MANIFEST).read_text())
+        manifest = json.loads((model_dir(model_id) / MANIFEST).read_text(encoding="utf-8"))
     return {
         "id": spec.id,
         "name": spec.name,
@@ -168,6 +284,8 @@ def describe(model_id: str) -> dict[str, Any]:
         "revision": spec.revision,
         "size_bytes": spec.size_bytes,
         "recommended": spec.recommended,
+        "engine": spec.engine,
+        "license": spec.license,
         "installed": is_installed(model_id),
         "downloaded_at": manifest.get("downloaded_at"),
         "path": str(model_dir(model_id)),
@@ -212,7 +330,7 @@ def download(
             url = f"{HF_BASE}/{spec.repo}/resolve/{spec.revision}/{f.name}"
             dest = staging / f.name
             digest = hashlib.sha256()
-            req = urllib.request.Request(url, headers={"User-Agent": "VideoStudioAI/0.2"})
+            req = urllib.request.Request(url, headers={"User-Agent": "VideoStudioAI-Community"})
             with urllib.request.urlopen(req, timeout=60) as resp, open(dest, "wb") as out:
                 while True:
                     if cancel is not None and cancel.is_set():
@@ -239,7 +357,7 @@ def download(
             "downloaded_at": datetime.now(UTC).isoformat(),
             "verified": True,
         }
-        (staging / MANIFEST).write_text(json.dumps(manifest, indent=2))
+        (staging / MANIFEST).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         final = model_dir(model_id)
         shutil.rmtree(final, ignore_errors=True)
         os.replace(staging, final)

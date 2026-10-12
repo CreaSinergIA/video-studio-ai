@@ -318,12 +318,14 @@ class PlanIntervention(_Strict):
     anchor_to_word: str | None = None
     timing: Literal["word_anchored", "model_seconds", "repaired"]
     segment_ids: list[str] = Field(default_factory=list)
-    transcript_excerpt: str = ""
+    # Topes de longitud (Community Edition): mismos límites que las propuestas de Claude, para
+    # que una edición manual o un plan importado no puedan crecer sin control.
+    transcript_excerpt: str = Field(default="", max_length=20000)
     scene_indices: list[int] = Field(default_factory=list)
     frame_ids: list[str] = Field(default_factory=list)
     type: InterventionType
-    goal: str
-    visual_description: str
+    goal: str = Field(max_length=400)
+    visual_description: str = Field(max_length=1200)
     style: StyleId
     composition: Composition
     elements: list[Element] = Field(default_factory=list)
@@ -335,12 +337,12 @@ class PlanIntervention(_Strict):
     # Zonas que no se deben tapar, medidas (rostros detectados en los fotogramas del tramo).
     protected_regions: list[Region] = Field(default_factory=list)
     subtitles: SubtitleTreatment = "keep"
-    rationale: str
+    rationale: str = Field(max_length=800)
     evidence: Evidence
     confidence: Level = "medium"
     status: InterventionStatus = "proposed"
     status_history: list[StatusEvent] = Field(default_factory=list)
-    user_note: str = ""
+    user_note: str = Field(default="", max_length=1000)
     origin: Literal["generated", "revised", "alternative", "manual"] = "generated"
     revision: int = 1
     warnings: list[str] = Field(default_factory=list)

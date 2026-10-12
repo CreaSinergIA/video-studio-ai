@@ -19,6 +19,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import sys
 import time
 import unicodedata
@@ -74,7 +75,9 @@ def normalize_user_path(raw: str) -> Path:
         raise StorageError("path_invalid", "La ruta contiene caracteres no válidos.", 422)
     path = Path(raw).expanduser()
     if not path.is_absolute():
-        raise StorageError("path_invalid", "La ruta debe ser absoluta (p. ej. /Volumes/…).", 422)
+        raise StorageError(
+            "path_invalid", "La ruta debe ser absoluta (p. ej. /Volumes/… o D:\\…).", 422
+        )
     # abspath normaliza «..» sin seguir enlaces ni exigir que exista.
     return Path(os.path.abspath(path))
 
@@ -168,8 +171,17 @@ def read_json(path: Path) -> Any | None:
 # ---------------------------------------------------------------------------
 
 
+def _windows_external_drive(path: Path) -> str | None:
+    """Windows: unidad distinta de la del sistema (``D:``, ``E:``…), típica de discos externos."""
+    drive = path.drive.upper()
+    system = os.environ.get("SYSTEMDRIVE", "C:").upper()
+    return drive if drive and drive != system and not drive.startswith("\\\\") else None
+
+
 def _volume_hint(path: Path) -> str | None:
     """Nombre del volumen si la ruta está en un punto de montaje típico de discos externos."""
+    if sys.platform == "win32":
+        return _windows_external_drive(path)
     parts = path.parts
     if sys.platform == "darwin" and len(parts) >= 3 and parts[1] == "Volumes":
         return parts[2]
@@ -184,6 +196,8 @@ def _volume_root(path: Path) -> Path | None:
     hint = _volume_hint(path)
     if hint is None:
         return None
+    if sys.platform == "win32":
+        return Path(path.anchor)
     parts = path.parts
     idx = parts.index(hint)
     return Path(*parts[: idx + 1])
@@ -392,7 +406,7 @@ def inspect_candidate(raw_path: str) -> CandidateReport:
                 "La carpeta ya contiene otros archivos. Se recomienda usar una subcarpeta "
                 "dedicada (p. ej. «VideoStudio») para no mezclar archivos."
             )
-        if volume_root is None and sys.platform == "darwin":
+        if volume_root is None and sys.platform in ("darwin", "win32"):
             warnings.append(
                 "La ruta está en el disco del sistema, no en un disco externo. Funciona, pero los "
                 "videos ocuparán espacio interno."
@@ -477,9 +491,16 @@ def rmtree_tolerant(path: Path, attempts: int = 3) -> bool:
     los ve en el listado y falla con FileNotFoundError al intentar borrarlos.
     """
 
-    def onexc(_func: Any, _path: str, exc: BaseException) -> None:
-        if not isinstance(exc, FileNotFoundError):
-            raise exc
+    def onexc(func: Any, failed: str, exc: BaseException) -> None:
+        if isinstance(exc, FileNotFoundError):
+            return
+        # Windows no borra archivos de solo lectura (los originales importados lo son): se
+        # quita el atributo y se reintenta. En macOS/Linux el permiso del directorio basta.
+        if isinstance(exc, PermissionError) and sys.platform == "win32":
+            os.chmod(failed, stat.S_IWRITE | stat.S_IREAD)
+            func(failed)
+            return
+        raise exc
 
     for _ in range(attempts):
         with contextlib.suppress(FileNotFoundError):

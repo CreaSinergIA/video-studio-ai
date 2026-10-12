@@ -551,9 +551,11 @@ export function AnalysisSettingsSection() {
       title="Transcripción y análisis"
       description="Todo se procesa en este equipo. Cambiar estos valores no reprocesa nada por sí solo: al volver a analizar se genera un resultado nuevo (los anteriores quedan en el historial)."
     >
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-faint">Modelos de reconocimiento de voz (MLX Whisper)</h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-faint">
+        Modelos de reconocimiento de voz{models ? ` (${models.engines.filter((e) => e.available).map((e) => e.name).join(' · ') || 'sin motor'})` : ''}
+      </h3>
       {models && !models.supported && (
-        <p className="mb-3 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">Este equipo no es un Mac con Apple Silicon: la transcripción local con MLX no está disponible.</p>
+        <p className="mb-3 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">No hay ningún motor de transcripción local disponible en este equipo. Ejecuta el instalador de nuevo.</p>
       )}
       <ul className="space-y-2">
         {models?.models.map((m) => (
@@ -569,6 +571,7 @@ export function AnalysisSettingsSection() {
                 <p className="mt-1 text-xs leading-relaxed text-fg-muted">{m.description}</p>
                 <a href={m.source_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[11px] text-accent hover:underline">
                   {m.repo} @ {m.revision.slice(0, 10)} · {formatBytes(m.size_bytes)}
+                  {m.license ? ` · licencia ${m.license}` : ''}
                 </a>
               </div>
               <div className="flex shrink-0 items-center gap-2">

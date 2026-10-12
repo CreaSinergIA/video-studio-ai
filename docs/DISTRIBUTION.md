@@ -22,7 +22,7 @@ La comprobación bloquea:
 - tipos de archivo de datos o medios y binarios no permitidos;
 - rutas absolutas de usuario de macOS y Windows, y rutas de volúmenes externos;
 - correos (salvo en los avisos de licencia de terceros);
-- claves y tokens con forma conocida (Anthropic, GitHub, AWS, Hugging Face y claves privadas);
+- claves y tokens con forma conocida (Anthropic, GitHub, AWS, Hugging Face y claves privadas); las claves ficticias de las pruebas usan el prefijo reservado `sk-ant-test-`, que ninguna clave real tiene;
 - **términos privados del mantenedor**, que se listan en `.privacy-terms.local`. Ese archivo no se versiona: así la propia lista de términos tampoco se publica.
 
 Si `gitleaks` está instalado, se ejecuta además sobre lo preparado.
@@ -31,4 +31,4 @@ Si `gitleaks` está instalado, se ejecuta además sobre lo preparado.
 1. `python3 scripts/privacy_check.py --all` y `gitleaks git --redact .` sin hallazgos.
 2. Revisar el autor de los commits: usar un correo de publicación, por ejemplo el `noreply` de GitHub, nunca uno personal.
 3. Comprobar que no hay remotos inesperados (`git remote -v`) y que no se suben etiquetas ni ramas ajenas.
-4. Cumplir lo pendiente en `docs/LICENSING.md`: licencia elegida y confirmación con Remotion.
+4. Elegir la licencia del código original (ver `docs/LICENSING.md`).

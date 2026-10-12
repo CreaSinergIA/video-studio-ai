@@ -72,6 +72,7 @@ def app_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("VSA_HOME", str(home))
     monkeypatch.setenv("VSA_ENV", "test")
     monkeypatch.setenv("VSA_FRONTEND_DIST", str(tmp_path / "no-dist"))
+    monkeypatch.setenv("VSA_SESSION_TOKEN", TEST_TOKEN)
     # Modelos de transcripción compartidos entre pruebas (evita descargas repetidas).
     models = os.environ.get("VSA_TEST_MODELS_DIR")
     if models:
@@ -85,10 +86,18 @@ def app_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     get_settings.cache_clear()
 
 
-def make_client() -> TestClient:
+TEST_TOKEN = "token-de-pruebas-0123456789abcdef0123456789"
+
+
+def make_client(authenticated: bool = True) -> TestClient:
+    """Cliente del panel; por defecto con el token de sesión de la instancia."""
     from app.main import create_app
 
-    return TestClient(create_app(), base_url="http://127.0.0.1", headers={"x-vsa-client": "1"})
+    app = create_app()
+    headers = {"x-vsa-client": "1"}
+    if authenticated:
+        headers["x-vsa-token"] = app.state.session_token
+    return TestClient(app, base_url="http://127.0.0.1", headers=headers)
 
 
 @pytest.fixture

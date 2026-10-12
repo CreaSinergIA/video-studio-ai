@@ -86,6 +86,17 @@ def _shortcuts() -> list[BrowseEntry]:
             items.append(
                 BrowseEntry(name=f"Disco · {entry.name}", path=str(entry), is_storage=False)
             )
+    if sys.platform == "win32":
+        # Unidades de Windows (C:, D:, discos USB…), sin unidades de red lentas.
+        import psutil
+
+        for part in psutil.disk_partitions(all=False):
+            if "cdrom" in part.opts or not part.mountpoint:
+                continue
+            letter = part.mountpoint.rstrip("\\")
+            items.append(
+                BrowseEntry(name=f"Unidad {letter}", path=part.mountpoint, is_storage=False)
+            )
     for base in (Path("/media") / os.environ.get("USER", ""), Path("/mnt")):
         if sys.platform.startswith("linux") and base.is_dir():
             for entry in sorted(base.iterdir()):
@@ -96,6 +107,7 @@ def _shortcuts() -> list[BrowseEntry]:
     for name, path in (
         ("Inicio", home),
         ("Películas", home / "Movies"),
+        ("Vídeos", home / "Videos"),
         ("Documentos", home / "Documents"),
     ):
         if path.is_dir():
