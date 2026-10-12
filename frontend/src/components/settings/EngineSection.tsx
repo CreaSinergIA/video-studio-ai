@@ -28,7 +28,7 @@ export function EngineSection() {
   return (
     <Section
       title="Motor de animaciones"
-      description="Las animaciones se generan por código en este equipo con Remotion (React + SVG), a partir del plan aprobado. No se usa ningún servicio externo de video."
+      description="Las animaciones se generan por código en este equipo con Remotion (React + SVG), a partir del plan aprobado. No se usa ningún servicio externo de video. Remotion tiene licencia propia: es gratuito para personas y empresas de hasta 3 personas; las organizaciones mayores necesitan su licencia de empresa (remotion.pro/license). El navegador de render se descarga de su fuente oficial."
     >
       <div className="rounded-xl border border-line bg-surface-2 p-4">
         <div className="mb-1 flex items-center gap-2">

@@ -7,7 +7,7 @@
   para videos largos.
 - El refinamiento acústico ajusta los límites de palabra de Whisper al inicio/fin real de la
   energía *solo cuando hay un silencio medible*; si no lo hay, conserva el tiempo de Whisper.
-  Validado contra audio con verdad de referencia (ver Obsidian → Pruebas y Validaciones).
+  Validado contra audio con verdad de referencia (pruebas de desarrollo).
 """
 
 from __future__ import annotations

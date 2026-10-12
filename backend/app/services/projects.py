@@ -10,13 +10,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.config import get_settings
 from app.domain.edit_config import EditConfig
 from app.domain.preferences import EditorState, GeneralPreferences
 from app.jobs.runner import ACTIVE_STATUSES, REGISTRY, create_job
 from app.models import Job, MediaAsset, Preset, Project, StorageLocation, new_id, utcnow
 from app.schemas import AssetOut, FilmstripOut, JobOut, ProjectDetail, ProjectSummary
 from app.services import presets as preset_service
-from app.services.media_probe import HDR_TRANSFERS
+from app.services.media_probe import HDR_TRANSFERS, MediaValidationError, probe_file
 from app.services.storage import (
     PROJECT_MANIFEST,
     PROJECTS_DIR,
@@ -405,6 +406,10 @@ def delete_project(session: Session, project: Project, keep_files: bool) -> tupl
     return staged is not None, message
 
 
+def _text(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
 def adopt_manifests(session: Session, location: StorageLocation, root: Path) -> int:
     """Registra en la base de datos los proyectos que existan en el almacenamiento pero no en
     la biblioteca (reinstalación, otra máquina, base de datos perdida)."""
@@ -445,11 +450,27 @@ def adopt_manifests(session: Session, location: StorageLocation, root: Path) -> 
                 file_path = resolve_inside(root, fields["file_rel"])
                 if not file_path.is_file() or session.get(MediaAsset, fields["id"]) is not None:
                     continue
-                asset = MediaAsset(**fields, project_id=project.id, status="processing", probe={})
+                # El manifiesto es un archivo editable: los datos técnicos se vuelven a medir en
+                # el propio video (llegan a filtros de FFmpeg) y el manifiesto solo aporta la
+                # identidad del recurso.
+                info = probe_file(
+                    get_settings().ffprobe, file_path, str(fields.get("original_filename") or "")
+                )
+                fields = {
+                    "id": str(fields["id"]),
+                    "role": str(fields.get("role") or "source"),
+                    "original_filename": str(fields.get("original_filename") or file_path.name),
+                    "file_rel": str(fields["file_rel"]),
+                    "size_bytes": file_path.stat().st_size,
+                    "sha256": _text(fields.get("sha256")),
+                    "quick_hash": _text(fields.get("quick_hash")),
+                    **info.asset_fields(),
+                }
+                asset = MediaAsset(**fields, project_id=project.id, status="processing")
                 session.add(asset)
                 session.flush()
                 create_job(session, "ingest", project_id=project.id, asset_id=asset.id)
-            except (KeyError, TypeError, ValueError, StorageError) as exc:
+            except (KeyError, TypeError, ValueError, StorageError, MediaValidationError) as exc:
                 log.warning("Recurso del manifiesto %s ignorado: %s", entry.name, exc)
         adopted += 1
         log.info("Proyecto adoptado desde el almacenamiento: %s (%s)", project.name, project.id)

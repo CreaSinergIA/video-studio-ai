@@ -218,6 +218,13 @@ def import_from_path(body: ImportFromPath, session: Session = Depends(get_sessio
     if not source.is_file():
         raise StorageError("path_missing", f"No se encuentra el archivo: {source}", 404)
     _require_extension(source.name)
+    with source.open("rb") as fh:
+        if not looks_like_iso_bmff(fh.read(12)):
+            raise MediaValidationError(
+                "not_mp4_mov",
+                "El contenido no es un MP4/MOV real (la extensión no coincide con el formato del "
+                "archivo).",
+            )
     probe_file(get_settings().ffprobe, source)  # validación temprana (solo lectura)
     location, root = storage_manager.require_active(session)
     if body.project_id:

@@ -37,7 +37,13 @@ test('modelo de transcripción disponible (descarga explícita desde Ajustes si 
   const models = await api<{ models: { id: string; installed: boolean }[] }>(page, '/api/asr/models')
   if (!models.models.find((m) => m.id === 'large-v3-turbo')?.installed) {
     await section.getByRole('button', { name: 'Descargar' }).first().click()
-    await expect(section.getByText('Instalado').first()).toBeVisible({ timeout: 600_000 })
+    // Esperar a ESE modelo: otro ya instalado (p. ej. el de 4 bits) también muestra «Instalado».
+    await expect
+      .poll(async () => {
+        const st = await api<{ models: { id: string; installed: boolean }[] }>(page, '/api/asr/models')
+        return st.models.find((m) => m.id === 'large-v3-turbo')?.installed ?? false
+      }, { timeout: 600_000, intervals: [3000] })
+      .toBe(true)
   }
   await expect(section.getByText('Instalado').first()).toBeVisible()
   await shot(page, 'p2-01-modelos')

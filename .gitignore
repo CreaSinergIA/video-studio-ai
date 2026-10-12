@@ -38,6 +38,8 @@ coverage/
 *.mkv
 *.webm
 models/
+# Excepción: modelo de detección de rostros YuNet (MIT, opencv_zoo), incluido con su licencia.
+!backend/app/resources/models/
 engines/
 backups/
 logs/

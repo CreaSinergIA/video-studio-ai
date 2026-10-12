@@ -53,7 +53,7 @@ class ModelSpec:
         return sum(f.size for f in self.files)
 
 
-# Medidas propias en Apple M4 (ver Obsidian → Pruebas y Validaciones · Fase 2).
+# Medidas propias en un Mac con Apple M4 durante el desarrollo.
 CATALOG: dict[str, ModelSpec] = {
     "large-v3-turbo": ModelSpec(
         id="large-v3-turbo",

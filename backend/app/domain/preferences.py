@@ -65,7 +65,9 @@ class ClaudePreferences(BaseModel):
 
     # claude_code: CLI de Claude Code instalado y con sesión del usuario (plan de suscripción).
     # api: Messages API con clave guardada en el llavero de macOS (facturación por tokens).
-    transport: Literal["claude_code", "api"] = "claude_code"
+    # Community Edition: clave de API propia del usuario (mecanismo autorizado por Anthropic
+    # para aplicaciones de terceros). «claude_code» solo existe para pruebas con un CLI simulado.
+    transport: Literal["claude_code", "api"] = "api"
     model: ClaudeModelId = "claude-opus-5-5"
     effort: ClaudeEffort = "medium"
     cli_path: str | None = None  # None: detección automática

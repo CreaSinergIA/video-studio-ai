@@ -9,8 +9,12 @@ import subprocess
 import sys
 from typing import Any
 
+from app import edition
 from app.config import APP_VERSION, Settings
 from app.db import check_integrity
+from app.platform import detect
+from app.platform.encoders import diagnose as encoder_diagnose
+from app.platform.transcription import engines as transcription_engines
 from app.services import asr_models
 from app.services.media_tools import available_encoders, binary_version
 from app.services.native import native_dialogs_supported
@@ -69,7 +73,19 @@ def collect(settings: Settings, log_file: str | None) -> dict[str, Any]:
     encoders = available_encoders(settings.ffmpeg)
     db_size = settings.db_path.stat().st_size if settings.db_path.exists() else 0
     return {
-        "app": {"name": "Video Studio AI", "version": APP_VERSION, "phase": 5},
+        "app": {
+            "name": edition.PRODUCT_NAME,
+            "edition": edition.EDITION_NAME,
+            "creator": edition.CREATOR,
+            "version": APP_VERSION,
+            "phase": 5,
+        },
+        # Diagnóstico multiplataforma (Community Edition): qué está disponible en este equipo.
+        "platform": {
+            **detect().as_dict(),
+            "transcription_engines": [e.as_dict() for e in transcription_engines()],
+            "encoders": encoder_diagnose(encoders),
+        },
         "os": _os_name(),
         "arch": platform.machine(),
         "cpu": _cpu_name(),

@@ -45,6 +45,7 @@ def fake_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]
     log = tmp_path / "fake_claude.log"
     monkeypatch.setenv("FAKE_CLAUDE_LOG", str(log))
     monkeypatch.setenv("FAKE_CLAUDE_MODE", "ok")
+    monkeypatch.setenv("VSA_ENV", "test")  # el transporte por CLI solo existe en pruebas
     # Si existiera una clave en el entorno, el transporte de Claude Code debe eliminarla.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-no-debe-llegar")
     return {"cli": script, "log": log}
@@ -52,7 +53,8 @@ def fake_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]
 
 def _use_fake(client: TestClient, cli: Path, **extra: Any) -> None:
     prefs = client.get("/api/claude/settings").json()
-    prefs.update(cli_path=str(cli), **extra)
+    # Community Edition: el transporte por CLI solo existe en el entorno de pruebas (CLI simulado).
+    prefs.update(transport="claude_code", cli_path=str(cli), **extra)
     assert client.put("/api/claude/settings", json=prefs).status_code == 200
 
 

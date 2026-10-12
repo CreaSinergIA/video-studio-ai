@@ -23,7 +23,6 @@ import json
 import logging
 import os
 import shutil
-import signal
 import subprocess
 import tempfile
 import threading
@@ -33,12 +32,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app import edition
 from app.domain.preferences import ClaudePreferences
+from app.platform import processes
 from app.services.media_tools import Cancelled
 
 log = logging.getLogger(__name__)
 
-KEYCHAIN_SERVICE = "VideoStudioAI"
+KEYCHAIN_SERVICE = edition.KEYCHAIN_SERVICE  # propio de esta edición: nunca lee otra copia
 KEYCHAIN_ACCOUNT = "anthropic-api-key"
 # Única herramienta que Claude Code añade para la salida estructurada (interna, sin efectos).
 ALLOWED_INTERNAL_TOOLS = {"StructuredOutput"}
@@ -101,7 +102,18 @@ def image_block(jpeg: bytes) -> Block:
 # ---------------------------------------------------------------------------
 
 
+def cli_transport_allowed() -> bool:
+    """El transporte por Claude Code (inicio de sesión de Claude.ai) no se ofrece en la
+    Community Edition: Anthropic no permite que aplicaciones de terceros usen la suscripción de
+    sus usuarios. Solo se habilita en el entorno de pruebas, con un CLI simulado."""
+    return edition.ALLOW_CLAUDE_CODE_TRANSPORT or os.environ.get("VSA_ENV") == "test"
+
+
 def find_cli(prefs: ClaudePreferences) -> Path | None:
+    # Sin transporte por CLI no se busca ni se ejecuta ningún binario: la ruta configurable
+    # no puede convertirse en una forma de ejecutar programas arbitrarios.
+    if not cli_transport_allowed():
+        return None
     if prefs.cli_path:
         p = Path(prefs.cli_path).expanduser()
         return p if p.is_file() and os.access(p, os.X_OK) else None
@@ -265,7 +277,7 @@ def run_claude_code(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            start_new_session=True,  # para poder terminar el grupo completo al cancelar
+            **processes.group_kwargs(),  # para poder terminar el árbol completo al cancelar
         )
     except OSError as exc:
         shutil.rmtree(workdir, ignore_errors=True)
@@ -275,12 +287,7 @@ def run_claude_code(
 
     def _kill(reason: str) -> None:
         killed.setdefault("reason", reason)
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(proc.pid, signal.SIGTERM)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=3)
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(proc.pid, signal.SIGKILL)
+        processes.terminate_tree(proc, grace=3)
 
     def _watch() -> None:
         while proc.poll() is None:
@@ -439,19 +446,30 @@ def keychain_set(key: str) -> None:
     if not key.replace("-", "").replace("_", "").isalnum():
         raise ClaudeError("invalid_key", "Formato de clave no válido.")
     command = f"add-generic-password -U -s {KEYCHAIN_SERVICE} -a {KEYCHAIN_ACCOUNT} -w {key}\n"
-    out = subprocess.run(
-        ["security", "-i"], input=command, capture_output=True, text=True, timeout=10
-    )
+    try:
+        out = subprocess.run(
+            ["security", "-i"], input=command, capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        # Sin la herramienta `security` (p. ej. Windows): error claro en lugar de un 500.
+        raise ClaudeError(
+            "keychain_unavailable", "El llavero del sistema no está disponible en este equipo."
+        ) from exc
     if out.returncode != 0:
         raise ClaudeError("keychain", "No se pudo guardar la clave en el llavero de macOS.")
 
 
 def keychain_delete() -> None:
-    subprocess.run(
-        ["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT],
-        capture_output=True,
-        timeout=10,
-    )
+    try:
+        subprocess.run(
+            ["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", KEYCHAIN_ACCOUNT],
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ClaudeError(
+            "keychain_unavailable", "El llavero del sistema no está disponible en este equipo."
+        ) from exc
 
 
 def api_schema(schema: dict[str, Any]) -> dict[str, Any]:
@@ -601,5 +619,11 @@ def run(
     on_event: Callable[[str], None] | None = None,
     model: str | None = None,
 ) -> ClaudeResult:
+    if prefs.transport != "api" and not cli_transport_allowed():
+        raise ClaudeError(
+            "transport_unavailable",
+            "Esta edición se conecta a Claude con tu propia clave de API de Anthropic "
+            "(Ajustes → Claude).",
+        )
     fn = run_api if prefs.transport == "api" else run_claude_code
     return fn(prefs, system, blocks, schema, cancel=cancel, on_event=on_event, model=model)

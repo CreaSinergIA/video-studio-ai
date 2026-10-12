@@ -42,7 +42,7 @@ test.beforeAll(async ({ request }) => {
   if (REAL) return
   test.skip(!FAKE || !existsSync(FAKE), 'Falta el CLI simulado (usa «npm run e2e»)')
   const prefs = await (await request.get('/api/claude/settings')).json()
-  const res = await request.put('/api/claude/settings', { data: { ...prefs, cli_path: FAKE }, headers: H })
+  const res = await request.put('/api/claude/settings', { data: { ...prefs, transport: 'claude_code', cli_path: FAKE }, headers: H })
   expect(res.ok()).toBeTruthy()
 })
 

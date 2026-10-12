@@ -347,7 +347,16 @@ export interface Capability {
 }
 
 export interface SystemInfo {
-  app: { name: string; version: string; phase: number }
+  app: { name: string; version: string; phase: number; edition?: string; creator?: string }
+  platform?: {
+    os: string
+    arch: string
+    apple_silicon: boolean
+    nvidia_gpu: string | null
+    notes: string[]
+    transcription_engines: { id: string; name: string; implemented: boolean; available: boolean; reason: string }[]
+    encoders: Record<string, { name: string; present: boolean; validated: boolean }[]>
+  }
   os: string
   arch: string
   cpu: string
@@ -763,6 +772,7 @@ export interface ClaudeCheck {
 }
 
 export interface ClaudeStatus {
+  transports?: ('api' | 'claude_code')[]
   transport: 'claude_code' | 'api'
   model: string
   effort: ClaudeEffort

@@ -81,6 +81,9 @@ def reveal_in_file_manager(path: Path) -> bool:
             subprocess.run(["open", "-R", str(path)], check=True, timeout=10)
         elif sys.platform.startswith("linux"):
             subprocess.run(["xdg-open", str(path.parent)], check=True, timeout=10)
+        elif sys.platform == "win32":  # pragma: no cover  (no validado todavía en Windows)
+            # explorer.exe devuelve código 1 aunque funcione: no se comprueba el resultado.
+            subprocess.run(["explorer", f"/select,{path}"], check=False, timeout=10)
         else:
             return False
         return True

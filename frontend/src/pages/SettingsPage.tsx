@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
-import { AudioLines, Clapperboard, Cpu, DatabaseBackup, HardDrive, Layers, Palette, Sparkles, SlidersHorizontal } from 'lucide-react'
+import { AudioLines, Clapperboard, Cpu, DatabaseBackup, Info, HardDrive, Layers, Palette, Sparkles, SlidersHorizontal } from 'lucide-react'
+import { AboutSection } from '@/components/settings/AboutSection'
 import { BackupsSection } from '@/components/settings/BackupsSection'
 import { ClaudeSection } from '@/components/settings/ClaudeSection'
 import { EngineSection } from '@/components/settings/EngineSection'
@@ -24,6 +25,7 @@ const SECTIONS = [
   { id: 'styles', label: 'Estilos', icon: Palette },
   { id: 'backups', label: 'Datos y respaldos', icon: DatabaseBackup },
   { id: 'environment', label: 'Entorno', icon: Cpu },
+  { id: 'about', label: 'Acerca de', icon: Info },
 ]
 
 export function SettingsPage() {
@@ -102,6 +104,9 @@ export function SettingsPage() {
           </div>
           <div id="environment" className="scroll-mt-8">
             <EnvironmentSection />
+          </div>
+          <div id="about" className="scroll-mt-8">
+            <AboutSection />
           </div>
         </div>
       </div>

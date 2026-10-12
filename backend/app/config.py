@@ -9,24 +9,22 @@ from __future__ import annotations
 import ipaddress
 import os
 import shutil
-import sys
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from app import edition
+from app.platform import paths
+
 APP_NAME = "Video Studio AI"
 APP_VERSION = "0.5.0"
 
-DEFAULT_PORT = 8765
+DEFAULT_PORT = edition.DEFAULT_PORT
 
 
 def _default_home() -> Path:
-    """Directorio de datos de la app según la plataforma (siempre en el disco del sistema)."""
-    if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "VideoStudioAI"
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "video-studio-ai"
+    """Directorio de datos propio de esta edición según la plataforma (ver app.platform)."""
+    return paths.default_data_dir()
 
 
 def _is_loopback(host: str) -> bool:

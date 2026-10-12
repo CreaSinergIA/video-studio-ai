@@ -3,9 +3,22 @@
 //   node scripts/render.mjs render <job.json>
 // Emite una línea JSON por evento en stdout. SIGTERM cancela el render en curso.
 import fs from 'node:fs'
+import net from 'node:net'
 import path from 'node:path'
 import { bundle } from '@remotion/bundler'
 import { makeCancelSignal, openBrowser, renderMedia, selectComposition } from '@remotion/renderer'
+
+// El servidor interno de Remotion (archivos y video fuera de hilo, puertos 3000–3100) escucha
+// en todas las interfaces y no ofrece opción para evitarlo. Aquí se limita a la interfaz local:
+// el navegador de render lo abre como http://localhost:<puerto>.
+const listen = net.Server.prototype.listen
+net.Server.prototype.listen = function (...args) {
+  const opts = args[0]
+  if (opts && typeof opts === 'object' && opts.path === undefined && (opts.host === '0.0.0.0' || opts.host === '::' || opts.host === undefined)) {
+    args[0] = { ...opts, host: '127.0.0.1' }
+  }
+  return listen.apply(this, args)
+}
 
 const emit = (o) => process.stdout.write(JSON.stringify(o) + '\n')
 const [, , cmd, ...args] = process.argv

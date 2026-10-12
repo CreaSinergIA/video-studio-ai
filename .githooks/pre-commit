@@ -1,0 +1,4 @@
+#!/bin/sh
+# Bloquea commits con datos personales, medios, bases de datos o secretos.
+# Activación (una vez por clon):  git config core.hooksPath .githooks
+exec python3 "$(git rev-parse --show-toplevel)/scripts/privacy_check.py" --staged

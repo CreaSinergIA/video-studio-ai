@@ -236,7 +236,7 @@ test('ajustes: presets, tema y entorno', async ({ page }) => {
   await expect(page.getByText('Regeneración selectiva y versiones de escena')).toBeVisible()
   await expect(page.getByText('Copias de seguridad verificadas')).toBeVisible()
   await page.locator('#storage').scrollIntoViewIfNeeded()
-  await expect(page.getByText('Conectado')).toBeVisible()
+  await expect(page.getByText('Conectado', { exact: true })).toBeVisible()
   await shot(page, '09-ajustes')
 })
 

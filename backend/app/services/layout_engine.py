@@ -8,7 +8,7 @@ Una animación informativa debe quedar fuera de todo lo que no se puede tapar o 
 - otras animaciones visibles al mismo tiempo.
 
 Todo se trabaja en coordenadas normalizadas (0–1), independientes de la resolución. Las zonas
-de la interfaz son **conservadoras** y están documentadas con sus fuentes en Obsidian
+de la interfaz son **conservadoras** y están documentadas con sus fuentes en ``SOURCES`` (más abajo)
 («Composición y Render»): las plataformas no publican una única zona exacta y cambia según el
 dispositivo y la longitud del texto de la publicación.
 

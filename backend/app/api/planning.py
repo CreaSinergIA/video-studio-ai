@@ -28,6 +28,7 @@ from app.services import (
     planning,
 )
 from app.services import projects as project_service
+from app.services.claude_client import ClaudeError
 from app.services.plan_context import PlanInputError
 from app.services.plan_validation import Validator, approval_problems
 from app.services.planning import PlanError
@@ -49,6 +50,13 @@ def get_claude_settings(session: Session = Depends(get_session)):
 
 @router.put("/claude/settings", response_model=ClaudePreferences)
 def put_claude_settings(body: ClaudePreferences, session: Session = Depends(get_session)):
+    if body.transport != "api" and not claude_client.cli_transport_allowed():
+        raise ClaudeError(
+            "transport_unavailable",
+            "Esta edición solo admite tu propia clave de API de Anthropic.",
+        )
+    if not claude_client.cli_transport_allowed():
+        body = body.model_copy(update={"cli_path": None})
     return app_settings.save_claude(session, body)
 
 
@@ -63,6 +71,8 @@ def claude_status(session: Session = Depends(get_session)) -> dict[str, Any]:
         "effort": prefs.effort,
         "last_check": last or None,
         "api_key_saved": claude_client.keychain_has_key() if sys.platform == "darwin" else False,
+        # Transportes disponibles en esta edición (la Community Edition: solo clave de API).
+        "transports": ["api"] + (["claude_code"] if claude_client.cli_transport_allowed() else []),
     }
     if prefs.transport == "claude_code":
         cli = claude_client.cli_status(prefs)
@@ -180,6 +190,11 @@ def delete_api_key() -> None:
 @router.post("/claude/login")
 def open_login(session: Session = Depends(get_session)) -> dict[str, Any]:
     """Abre Terminal con el inicio de sesión oficial de Claude Code (única acción manual)."""
+    if not claude_client.cli_transport_allowed():
+        raise ClaudeError(
+            "transport_unavailable",
+            "Esta edición solo admite tu propia clave de API de Anthropic.",
+        )
     prefs = app_settings.get_claude(session)
     cli = claude_client.find_cli(prefs)
     if cli is None:

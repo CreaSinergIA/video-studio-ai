@@ -21,6 +21,9 @@ WEB_VIDEO_CODECS = {
 }
 WEB_AUDIO_CODECS = {"aac", "mp3", "opus", "flac", "alac"}
 HDR_TRANSFERS = {"arib-std-b67", "smpte2084"}
+# ffprobe solo abre archivos locales con el demuxer MP4/MOV: un archivo hostil con otra
+# extensión real (listas HLS, concat…) no llega a abrir red ni otros archivos.
+SAFE_INPUT_ARGS = ["-protocol_whitelist", "file", "-format_whitelist", "mov,mp4,m4a,3gp,3g2,mj2"]
 
 
 class MediaValidationError(Exception):
@@ -78,6 +81,36 @@ class MediaInfo:
     audio_tracks: list[AudioTrack] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
 
+    def asset_fields(self) -> dict[str, Any]:
+        """Campos técnicos de `MediaAsset` medidos en el propio archivo."""
+        return {
+            "container": self.container,
+            "format_name": self.format_name,
+            "major_brand": self.major_brand,
+            "duration": self.duration,
+            "width": self.width,
+            "height": self.height,
+            "display_width": self.display_width,
+            "display_height": self.display_height,
+            "rotation": self.rotation,
+            "orientation": self.orientation,
+            "fps": self.fps,
+            "fps_num": self.fps_num,
+            "fps_den": self.fps_den,
+            "video_codec": self.video_codec,
+            "video_profile": self.video_profile,
+            "pix_fmt": self.pix_fmt,
+            "bit_depth": self.bit_depth,
+            "color_transfer": self.color_transfer,
+            "bit_rate": self.bit_rate,
+            "frame_count": self.frame_count,
+            "has_audio": self.has_audio,
+            "audio_tracks": [t.__dict__ for t in self.audio_tracks],
+            "creation_time": self.creation_time,
+            "probe": self.raw,
+            "browser_playable": self.browser_playable,
+        }
+
     @property
     def has_audio(self) -> bool:
         return bool(self.audio_tracks)
@@ -132,6 +165,7 @@ def run_ffprobe(ffprobe: str, path: Path, timeout: float = 60) -> dict[str, Any]
         ffprobe,
         "-v",
         "error",
+        *SAFE_INPUT_ARGS,
         "-print_format",
         "json",
         "-show_format",

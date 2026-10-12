@@ -162,6 +162,10 @@ export function AppShell() {
         </nav>
         <div className="mt-auto flex flex-col items-center gap-2">
           <StorageIndicator />
+          {/* Atribución discreta: solo en el panel, nunca en los videos ni en las vistas previas. */}
+          <NavLink to="/settings#about" className="px-1 text-center text-[8.5px] leading-tight text-fg-faint/70 transition hover:text-fg-muted" title="Acerca de Video Studio AI">
+            Created by Gabo
+          </NavLink>
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">

@@ -27,7 +27,11 @@ from tests.conftest import FFMPEG, sha256, wait_idle
 from tests.test_phase3 import _calls, _generate, _project, _use_fake, fake_cli  # noqa: F401
 
 REAL_ENGINE = os.environ.get("VSA_TEST_REMOTION") == "1"
-ENGINES = Path.home() / "Library/Application Support/VideoStudioAI/engines"
+# Navegador de render ya instalado por esta edición (o el indicado en VSA_TEST_ENGINES_DIR).
+ENGINES = Path(
+    os.environ.get("VSA_TEST_ENGINES_DIR")
+    or Path.home() / "Library/Application Support/VideoStudioAI-Community/engines"
+)
 
 
 def _ffprobe(path: Path) -> dict[str, Any]:

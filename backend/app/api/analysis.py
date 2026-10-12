@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -557,8 +558,11 @@ def open_export(export_id: str, session: Session = Depends(get_session)):
     """Abre el archivo con la aplicación predeterminada del sistema (p. ej. QuickTime)."""
     e = _export(session, export_id)
     path = _export_path(session, e)
-    cmd = ["open", str(path)] if sys.platform == "darwin" else ["xdg-open", str(path)]
     try:
+        if sys.platform == "win32":  # pragma: no cover  (no validado todavía en Windows)
+            os.startfile(path)  # type: ignore[attr-defined]
+            return {"ok": True}
+        cmd = ["open", str(path)] if sys.platform == "darwin" else ["xdg-open", str(path)]
         subprocess.run(cmd, check=True, timeout=10)
         return {"ok": True}
     except (OSError, subprocess.SubprocessError):

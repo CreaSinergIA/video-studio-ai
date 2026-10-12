@@ -21,7 +21,6 @@ import json
 import logging
 import os
 import shutil
-import signal
 import subprocess
 import tempfile
 import threading
@@ -33,6 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import get_settings
+from app.platform import processes
 from app.services.media_tools import Cancelled
 
 log = logging.getLogger(__name__)
@@ -48,6 +48,8 @@ BROWSER: dict[str, Any] = {
     "url": "https://storage.googleapis.com/chrome-for-testing-public/157.0.8080.0/mac-arm64/chrome-headless-shell-mac-arm64.zip",
     "size": 103_864_219,
     "md5_b64": "+fkyl3YdZLGBlWo7N14QWA==",  # cabecera x-goog-hash publicada por Google
+    # SHA-256 fijado (dos descargas independientes coinciden): no depender solo de MD5.
+    "sha256": "8cd31d4bc5f7ea0930940292f1972c68f4296b01fbcb4fa709841a8f60eba95d",
     "executable": "chrome-headless-shell-mac-arm64/chrome-headless-shell",
 }
 RENDER_FONTS = [
@@ -196,6 +198,10 @@ def install_browser(
             raise EngineError(
                 "browser_hash",
                 "La huella MD5 del navegador no coincide con la publicada por Google.",
+            )
+        if sha.hexdigest() != BROWSER["sha256"]:
+            raise EngineError(
+                "browser_hash", "La huella SHA-256 del navegador no coincide con la esperada."
             )
         unpack = work / "unpacked"
         subprocess.run(["ditto", "-x", "-k", str(zpath), str(unpack)], check=True, timeout=300)
@@ -356,7 +362,7 @@ def _run_node(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        start_new_session=True,
+        **processes.group_kwargs(),
     )
     started = time.monotonic()
     killed: dict[str, str] = {}
@@ -365,12 +371,7 @@ def _run_node(
 
     def _kill(reason: str) -> None:
         killed.setdefault("reason", reason)
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(proc.pid, signal.SIGTERM)
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            proc.wait(timeout=5)
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(proc.pid, signal.SIGKILL)
+        processes.terminate_tree(proc, grace=5)
 
     def _watch() -> None:
         while proc.poll() is None:

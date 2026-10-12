@@ -144,7 +144,7 @@ class ExportSettings(_Model):
     format: Literal["mp4_h264", "mp4_hevc", "mov_prores"] = "mp4_h264"
     quality: Literal["high", "max"] = "high"
     # Fase 2: VideoToolbox (hardware) iguala la calidad por tamaño del software y es 4–25×
-    # más rápido en Apple Silicon (medido con VMAF; ver Obsidian). Sin hardware → software.
+    # más rápido en Apple Silicon (medido con VMAF en el desarrollo). Sin hardware → software.
     encoder: Literal["hardware", "software"] = "hardware"
 
 

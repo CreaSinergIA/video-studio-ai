@@ -15,16 +15,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$ROOT/backend"
 FRONTEND="$ROOT/frontend"
 RENDERER="$ROOT/renderer"
-PORT="${VSA_PORT:-8765}"
+PORT="${VSA_PORT:-8775}"  # Community Edition: puerto propio
 HOST="127.0.0.1"
 URL="http://$HOST:$PORT"
 
 if [[ -n "${VSA_HOME:-}" ]]; then
   DATA_HOME="$VSA_HOME"
 elif [[ "$(uname)" == "Darwin" ]]; then
-  DATA_HOME="$HOME/Library/Application Support/VideoStudioAI"
+  DATA_HOME="$HOME/Library/Application Support/VideoStudioAI-Community"
 else
-  DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/video-studio-ai"
+  DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/videostudioai-community"
 fi
 RUN_DIR="$DATA_HOME/run"
 PID_FILE="$RUN_DIR/server.pid"

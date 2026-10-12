@@ -13,6 +13,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -625,15 +626,26 @@ def treated_track(ap: Approved, width: int, height: int) -> dict[str, Any] | Non
     return {**track, "blocks": blocks}
 
 
+_SAFE_LAYOUT = re.compile(r"[a-z0-9.]{1,24}")
+
+
 def composition(
     ap: Approved, compiled: list[dict[str, Any]], files: dict[str, Path], out_w: int, out_h: int
 ) -> compositor.Composition:
     tracks = ap.asset.audio_tracks or []
     rate = int((tracks[0] or {}).get("sample_rate") or 48000) if tracks else 48000
+    if not 8000 <= rate <= 192000:
+        rate = 48000
     first = (tracks[0] or {}) if tracks else {}
-    layout = str(first.get("channel_layout") or "")
-    if not layout:
+    # Estos valores se interpolan en el grafo de filtros: solo se aceptan nombres de
+    # disposición de canales con caracteres seguros.
+    layout = str(first.get("channel_layout") or "").split("(")[0]
+    if not _SAFE_LAYOUT.fullmatch(layout):
         layout = {1: "mono", 2: "stereo", 6: "5.1"}.get(int(first.get("channels") or 2), "stereo")
+    fps_num = int(ap.asset.fps_num or 30)
+    fps_den = int(ap.asset.fps_den or 1)
+    if not (0 < fps_num <= 1_000_000 and 0 < fps_den <= 1_000_000):
+        fps_num, fps_den = 30, 1
     # Preferencias de audio ACTUALES del proyecto (el usuario puede ajustarlas tras aprobar).
     audio = current_config(ap).audio
     voice = voice_measure(resolve_inside(ap.root, ap.asset.file_rel)) if tracks else (None, None)
@@ -643,8 +655,8 @@ def composition(
         voice_lufs=voice[0],
         voice_tp=voice[1],
         sample_rate=rate,
-        channel_layout=layout.split("(")[0],
-        fps_rate=f"{ap.asset.fps_num or 30}/{ap.asset.fps_den or 1}",
+        channel_layout=layout,
+        fps_rate=f"{fps_num}/{fps_den}",
         duration=float(ap.asset.duration or 0.0),
     )
     faces_center = (0.5, 0.42)

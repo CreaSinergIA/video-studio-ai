@@ -47,7 +47,7 @@ export VSA_E2E_FAKE_CLAUDE="$BASE/fake-claude"
 (cd ../backend && uv sync --quiet)
 # Fase 4: el navegador de render ya instalado por la app se enlaza (solo lectura) al entorno
 # aislado; sin él, las pruebas de la Fase 4 se omiten.
-ENGINES="${VSA_E2E_ENGINES:-$HOME/Library/Application Support/VideoStudioAI/engines}"
+ENGINES="${VSA_E2E_ENGINES:-$HOME/Library/Application Support/VideoStudioAI-Community/engines}"
 [[ -d "$ENGINES" ]] && ln -sfn "$ENGINES" "$VSA_E2E_HOME/engines"
 # Compilación propia de las pruebas: no reemplaza frontend/dist de la app en uso.
 export VSA_E2E_DIST="$BASE/dist"

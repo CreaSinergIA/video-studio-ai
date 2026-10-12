@@ -118,7 +118,7 @@ export function ClaudeSection() {
   return (
     <Section
       title="Director creativo (Claude)"
-      description="Claude Opus 5.5 interpreta tu video y propone el plan de edición. Recibe la transcripción con sus tiempos, los datos de escenas y rostros, tus preferencias y unos pocos fotogramas reducidos; nunca el archivo de video. Todo se guarda en este equipo."
+      description="Claude Opus 5.5 interpreta tu video y propone el plan de edición. Recibe la transcripción con sus tiempos, los datos de escenas y rostros, tus preferencias y unos pocos fotogramas reducidos; nunca el archivo de video. Se conecta con TU PROPIA clave de API de Anthropic: Video Studio AI es gratuito, pero el uso de Claude se factura en tu cuenta de Anthropic según su tarifa y sus límites."
     >
       <div className="rounded-xl border border-line bg-surface-2 p-4">
         <div className="mb-2 flex items-center gap-2">
@@ -209,7 +209,8 @@ export function ClaudeSection() {
 
       {prefs && (
         <div className="mt-5 divide-y divide-line">
-          <Field label="Mecanismo de conexión" hint="Claude Code reutiliza tu instalación y tu plan (uso personal en este equipo). La clave de API factura por tokens y sería la opción para un servidor.">
+          {(s?.transports ?? ['api']).includes('claude_code') && (
+          <Field label="Mecanismo de conexión" hint="Solo para pruebas automáticas con un CLI simulado.">
             <Segmented
               label="Mecanismo"
               value={prefs.transport}
@@ -220,8 +221,9 @@ export function ClaudeSection() {
               ]}
             />
           </Field>
+          )}
           {prefs.transport === 'api' && (
-            <Field label="Clave de API de Anthropic" hint="Se guarda en el llavero de macOS; nunca en el navegador, en la base de datos ni en Obsidian." stacked>
+            <Field label="Clave de API de Anthropic" hint="Créala en la Consola de Anthropic (console.anthropic.com). Se guarda en el llavero del sistema; nunca en el navegador, en la base de datos ni en archivos del proyecto." stacked>
               <div className="flex gap-2">
                 <Input type="password" autoComplete="off" placeholder={s?.api_key_saved ? '•••••••• (guardada)' : 'sk-ant-…'} value={key} onChange={(e) => setKey(e.target.value)} />
                 <Button
