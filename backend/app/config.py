@@ -86,6 +86,9 @@ def _resolve_binary(name: str, env_var: str, home: Path | None = None) -> str:
     if found:
         return found
     # Homebrew en Apple Silicon no siempre está en el PATH de procesos lanzados desde Finder.
+    # (VSA_IGNORE_SYSTEM_TOOLS=1 simula un equipo limpio en las pruebas de instalación.)
+    if os.environ.get("VSA_IGNORE_SYSTEM_TOOLS") == "1":
+        return name
     for candidate in (f"/opt/homebrew/bin/{name}", f"/usr/local/bin/{name}", f"/usr/bin/{name}"):
         if Path(candidate).exists():
             return candidate

@@ -140,6 +140,8 @@ def find_node() -> Path | None:
     found = shutil.which("node")
     if found:
         cands.append(Path(found))
+    if os.environ.get("VSA_IGNORE_SYSTEM_TOOLS") == "1":  # simula un equipo limpio
+        return next((c for c in cands if c.is_file() and tools.node_is_suitable(c)), None)
     nvm = Path.home() / ".nvm" / "versions" / "node"
     if nvm.is_dir():
         cands += sorted(

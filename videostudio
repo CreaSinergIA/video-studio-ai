@@ -41,8 +41,13 @@ uv_asset() {
   esac
 }
 
-# Desde Finder (.command o acceso directo) el PATH es mínimo.
-export PATH="$TOOLS/uv:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+# Desde Finder (.command o acceso directo) el PATH es mínimo: se añaden las rutas habituales.
+# VSA_IGNORE_SYSTEM_TOOLS=1 simula un equipo limpio (pruebas de instalación nueva).
+if [[ "${VSA_IGNORE_SYSTEM_TOOLS:-}" == "1" ]]; then
+  export PATH="$TOOLS/uv:$PATH"
+else
+  export PATH="$TOOLS/uv:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+fi
 # Python gestionado por uv dentro de la carpeta de datos (no se toca el Python del sistema).
 export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$TOOLS/python}"
 export PYTHONUTF8=1
@@ -98,7 +103,8 @@ python_env() {
   local dev=(--no-dev)
   [[ "${VSA_DEV_DEPS:-}" == "1" ]] && dev=()
   info "Preparando Python 3.12 y las dependencias del backend (uv sync)…"
-  (cd "$BACKEND" && "$uv" sync --frozen --quiet "${dev[@]}" "${extra[@]}") || fail "uv sync falló. Revisa tu conexión y vuelve a ejecutar ./videostudio install."
+  # ${a[@]+"${a[@]}"}: arrays vacíos válidos con «set -u» en el bash 3.2 de macOS.
+  (cd "$BACKEND" && "$uv" sync --frozen --quiet ${dev[@]+"${dev[@]}"} ${extra[@]+"${extra[@]}"}) || fail "uv sync falló. Revisa tu conexión y vuelve a ejecutar ./videostudio install."
   ok "Backend listo (backend/.venv)"
 }
 
