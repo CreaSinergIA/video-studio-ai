@@ -96,7 +96,7 @@ Diagnóstico: `./videostudio doctor` (macOS) o `videostudio.ps1 doctor` (Windows
 Todo se procesa y se guarda en tu equipo. No hay cuentas, servidores, telemetría ni pagos de Video Studio AI. Tus datos viven en la carpeta de proyectos que elijas y en la carpeta de la aplicación (macOS: `~/Library/Application Support/VideoStudioAI-Community`; Windows: `%LOCALAPPDATA%\VideoStudioAI-Community`).
 
 ## Licencias
-- **Código original:** [MIT](LICENSE), © 2026 Gabo. La licencia MIT cubre solo el código de este proyecto.
+- **Código original:** [MIT](LICENSE), © 2026 Gabo. La licencia MIT cubre solo el código de este proyecto ([NOTICE](NOTICE)).
 - **Remotion** (motor de animaciones) se instala por separado y tiene **su propia licencia**: gratuita para personas, organizaciones sin ánimo de lucro y empresas de hasta 3 personas; las organizaciones mayores necesitan su propia licencia ([remotion.pro/license](https://www.remotion.pro/license)). Cada usuario es responsable de cumplir sus condiciones.
 - **FFmpeg, modelos Whisper, navegador de render, fuentes** y demás dependencias conservan sus licencias: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

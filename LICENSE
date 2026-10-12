@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----------------------------------------------------------------------------
-
-Scope: this license covers only the original source code and documentation of
-Video Studio AI — Community Edition written by its author. It does NOT apply to
-third-party components, which keep their own licenses, including Remotion
-(Remotion License, installed separately by each user), FFmpeg, Node.js, uv,
-Python, the render browser (Chrome for Testing), Whisper and faster-whisper
-models, the YuNet face model, the bundled fonts (SIL OFL 1.1) and all npm and
-PyPI dependencies. See THIRD_PARTY_NOTICES.md.
