@@ -31,4 +31,4 @@ Si `gitleaks` está instalado, se ejecuta además sobre lo preparado.
 1. `python3 scripts/privacy_check.py --all` y `gitleaks git --redact .` sin hallazgos.
 2. Revisar el autor de los commits: usar un correo de publicación, por ejemplo el `noreply` de GitHub, nunca uno personal.
 3. Comprobar que no hay remotos inesperados (`git remote -v`) y que no se suben etiquetas ni ramas ajenas.
-4. Elegir la licencia del código original (ver `docs/LICENSING.md`).
+4. Mantener la licencia MIT del código original y los avisos de terceros (ver `docs/LICENSING.md`).

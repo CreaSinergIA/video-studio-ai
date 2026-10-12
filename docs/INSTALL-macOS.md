@@ -3,8 +3,8 @@
 Requisitos: Mac con Apple Silicon y macOS 14 o posterior ([REQUIREMENTS.md](REQUIREMENTS.md)). No hace falta Homebrew, Xcode ni permisos de administrador.
 
 ## 1. Descargar el proyecto
-- Con Git: `git clone <url-del-repositorio> video-studio-ai-community`
-- O descarga el ZIP desde GitHub y descomprímelo. Guárdalo en una carpeta de tu disco interno (por ejemplo `~/Developer` o `~/Aplicaciones`), no en un disco externo ni en una carpeta sincronizada con iCloud.
+- Con Git: `git clone https://github.com/CreaSinergIA/video-studio-ai.git`
+- O descarga el ZIP desde https://github.com/CreaSinergIA/video-studio-ai (botón «Code → Download ZIP») y descomprímelo. Guárdalo en una carpeta de tu disco interno (por ejemplo `~/Developer` o `~/Aplicaciones`), no en un disco externo ni en una carpeta sincronizada con iCloud.
 
 ## 2. Instalar
 **Opción A — doble clic:** abre la carpeta en Finder y haz doble clic en **Instalar Video Studio AI.command**.
@@ -12,7 +12,7 @@ Requisitos: Mac con Apple Silicon y macOS 14 o posterior ([REQUIREMENTS.md](REQU
 
 **Opción B — Terminal:**
 ```bash
-cd video-studio-ai-community
+cd video-studio-ai
 ./videostudio install
 ```
 

@@ -17,7 +17,7 @@ from app import edition
 from app.platform import paths
 
 APP_NAME = "Video Studio AI"
-APP_VERSION = "0.6.0"
+APP_VERSION = "1.0.0"
 
 DEFAULT_PORT = edition.DEFAULT_PORT
 

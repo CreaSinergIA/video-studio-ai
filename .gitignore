@@ -61,3 +61,6 @@ desktop.ini
 .claude/
 *.swp
 *~
+
+# --- Artefactos internos de la exportación (no se publican) ---
+.export-manifest.txt

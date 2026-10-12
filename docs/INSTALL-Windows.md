@@ -5,8 +5,8 @@
 Requisitos: Windows 10 (1809+) u 11 de **64 bits (x64)**, 8 GB de memoria, ~6 GB libres ([REQUIREMENTS.md](REQUIREMENTS.md)). **No hace falta** WSL, Docker, Python, una GPU NVIDIA ni permisos de administrador.
 
 ## 1. Descargar el proyecto
-- Con Git: `git clone <url-del-repositorio> C:\VideoStudioAI`
-- O descarga el ZIP desde GitHub: clic derecho → **Extraer todo** a una carpeta corta, por ejemplo `C:\VideoStudioAI` o `C:\Users\<tú>\VideoStudioAI`.
+- Con Git: `git clone https://github.com/CreaSinergIA/video-studio-ai.git C:\VideoStudioAI`
+- O descarga el ZIP desde https://github.com/CreaSinergIA/video-studio-ai («Code → Download ZIP»): clic derecho → **Extraer todo** a una carpeta corta, por ejemplo `C:\VideoStudioAI` o `C:\Users\<tú>\VideoStudioAI`.
 
 Usa una **ruta corta**: las dependencias de Node tienen rutas profundas y Windows limita las rutas a 260 caracteres si no están activadas las rutas largas. Evita carpetas sincronizadas con OneDrive.
 

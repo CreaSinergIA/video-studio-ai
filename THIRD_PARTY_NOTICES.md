@@ -1,6 +1,6 @@
 # Avisos de terceros
 
-Video Studio AI — Community Edition se apoya en componentes de terceros que **conservan sus propias licencias**. La licencia del código original de este proyecto (ver `docs/LICENSING.md`) **no** se aplica a ninguno de ellos.
+Video Studio AI — Community Edition se apoya en componentes de terceros que **conservan sus propias licencias**. La licencia **MIT** del código original de este proyecto ([LICENSE](LICENSE)) **no** se aplica a ninguno de ellos ni los sustituye.
 
 El inventario completo de dependencias, directas y transitivas, está en `docs/licenses/DEPENDENCIES.md`.
 

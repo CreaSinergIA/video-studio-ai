@@ -1,45 +1,50 @@
-# Instrucciones para Claude Code: instalar y abrir Video Studio AI
+# Instrucciones para Claude Code: instalar, abrir y actualizar Video Studio AI
 
-Este archivo lo lee Claude Code al abrir el repositorio. Si la persona te pide **instalar**, **abrir** o **arreglar** Video Studio AI — Community Edition, sigue estos pasos. Todo es local: no hay cuentas, servidores ni pagos de Video Studio AI.
+Si la persona te pide **instalar**, **abrir**, **actualizar** o **arreglar** Video Studio AI — Community Edition, sigue este archivo. Todo es local y gratuito: no hay cuentas, servidores ni pagos de Video Studio AI.
 
 ## Reglas
-- **Pregunta antes de descargar o instalar.** El instalador descarga (con versión y huella SHA-256 fijadas, solo si faltan) uv, Python 3.12, Node.js LTS, FFmpeg, el navegador de render (~105–125 MB) y un modelo de transcripción (0,5–1,6 GB). Explícaselo y pide confirmación. Con su «sí», ejecuta el instalador con `--yes` (tú no puedes responder a sus preguntas interactivas).
-- **Nada global ni con administrador.** No uses `sudo`, `brew install`, `winget`, `choco` ni cambies el PATH o la política de ejecución del sistema. El instalador lo guarda todo en la carpeta de datos de la aplicación.
-- **Nunca pidas ni escribas la clave de API de Anthropic.** La persona la pega en el panel (Ajustes → Claude o primera configuración). No la pongas en archivos, variables de entorno, comandos ni en el chat.
-- **No hagas solicitudes a Claude en nombre de la persona** (botón «Probar conexión» o generar planes): cuestan dinero en su cuenta.
-- No modifiques el código para «hacer que funcione» sin explicarlo antes. Si algo falla, usa `doctor` y `docs/TROUBLESHOOTING.md`.
+- **Pide permiso antes de descargar.** Explica qué va a descargar el instalador (solo lo que falte; versiones y huellas SHA-256 fijadas): uv y Python 3.12, Node.js LTS, FFmpeg, las dependencias del panel y de Remotion, el navegador de render (~105–125 MB) y un modelo de transcripción (0,5–1,6 GB). Con su «sí», ejecuta el instalador con `--yes` (tú no puedes responder a sus preguntas interactivas).
+- **Nada global ni con administrador:** no uses `sudo`, `brew install`, `winget`, `choco`, `npm -g` ni `pip install` fuera del proyecto, y no cambies el PATH ni la política de ejecución del sistema. El instalador lo guarda todo en la carpeta de la aplicación.
+- **Credenciales:** nunca pidas, leas, escribas ni muestres claves de API, tokens o cookies. La clave de Anthropic es **opcional** y la persona la pega en el panel (*primera configuración* o *Ajustes → Claude*). No uses tu propia sesión de Claude ni la de la persona para alimentar el panel.
+- **No hagas solicitudes de pago a Claude** desde el panel (botones «Probar conexión», «Planificar») en nombre de la persona.
+- **Rutas:** instala en la carpeta donde la persona te indique o en una ruta corta de su usuario (macOS: `~/video-studio-ai`; Windows: `C:\VideoStudioAI` o `%USERPROFILE%\VideoStudioAI`). Nunca en discos externos ni en carpetas sincronizadas (iCloud, OneDrive).
+- No modifiques el código para «hacer que funcione» sin explicarlo antes.
 
-## macOS
-```bash
-./videostudio install --yes        # instalación completa y abre el panel
-./videostudio install --yes --no-model   # sin descargar el modelo (se puede hacer desde el panel)
-./videostudio doctor               # diagnóstico
-./videostudio start | stop | status | logs
-```
-El instalador ofrece crear `~/Applications/Video Studio AI.app` (acceso directo). Con `--yes` lo crea; usa `--no-shortcut` si la persona no lo quiere.
+## Instalación paso a paso
+1. **Obtén el código** (si aún no estás dentro del repositorio):
+   `git clone https://github.com/CreaSinergIA/video-studio-ai.git` (o la ruta corta acordada) y entra en la carpeta. Si no hay Git, pide a la persona que descargue el ZIP de la página del repositorio y lo descomprima.
+2. **Reconoce el sistema:**
+   - macOS con Apple Silicon (`uname -sm` → `Darwin arm64`): compatible y validado.
+   - macOS Intel (`Darwin x86_64`): **no compatible**; explícalo y detente.
+   - Windows x64: compatible (pendiente de validación en hardware real; avísalo).
+   - Windows en ARM: **no compatible**; explícalo y detente.
+   - Lee `docs/INSTALL-macOS.md` o `docs/INSTALL-Windows.md` y `docs/REQUIREMENTS.md` si necesitas detalles.
+3. **Explica lo que se descargará y pide permiso** (ver *Reglas*).
+4. **Ejecuta el instalador** (comprueba los requisitos, instala dependencias, prepara datos, base de datos, navegador de render, modelo y acceso directo, y abre el panel):
+   - macOS: `./videostudio install --yes`
+   - Windows (PowerShell): `powershell -NoProfile -ExecutionPolicy Bypass -File .\videostudio.ps1 install --yes`
+   - Opciones: `--no-model` (descargar el modelo después, desde el panel), `--model large-v3-turbo-q4` (Mac, ligero) o `--model fw-small` (Windows, ligero), `--no-shortcut`, `--no-start`, `--cuda` (solo Windows con GPU NVIDIA y permiso de la persona).
+   - La instalación puede tardar 5–20 minutos según la conexión. Muestra el progreso con mensajes breves.
+5. **Primera configuración:** al terminar se abre el navegador en el asistente (carpeta de proyectos, comprobaciones del equipo, clave de Claude opcional). Dile a la persona que lo complete allí; tú no escribes la clave.
+6. **Informa del resultado:** la dirección local que muestra el instalador (normalmente `http://127.0.0.1:8775`, u otro puerto si estaba ocupado) y cómo volver a abrirlo:
+   - macOS: app **Video Studio AI** en `~/Applications`, **Video Studio AI.command** o `./videostudio start`;
+   - Windows: acceso directo **Video Studio AI** (Escritorio / menú Inicio) o **Video Studio AI.cmd**.
 
-## Windows 10/11 (x64)
-Desde PowerShell, en la carpeta del repositorio:
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\videostudio.ps1 install --yes
-powershell -NoProfile -ExecutionPolicy Bypass -File .\videostudio.ps1 doctor
-powershell -NoProfile -ExecutionPolicy Bypass -File .\videostudio.ps1 start   # o stop | status | logs
-```
-`-ExecutionPolicy Bypass` solo afecta a ese proceso. La persona también puede hacer doble clic en «Instalar Video Studio AI.cmd» y después en «Video Studio AI.cmd» o en el acceso directo del Escritorio.
+## Si algo falla
+- Lee el mensaje del instalador: indica el paso que falló y cómo resolverlo. Volver a ejecutar el instalador continúa donde se quedó.
+- Diagnóstico: `./videostudio doctor` (Windows: `videostudio.ps1 doctor`). Registro: `logs`.
+- Consulta `docs/TROUBLESHOOTING.md` y explica la solución en lenguaje sencillo.
+- Problemas habituales: sin conexión (repetir), ruta demasiado larga en Windows (mover a `C:\VideoStudioAI`), SmartScreen o Gatekeeper al hacer doble clic (usar la terminal), puerto ocupado (el lanzador elige otro solo).
+- Si el navegador muestra «Abre Video Studio AI desde su lanzador», ejecuta `start` u `open`.
 
-Con una GPU NVIDIA se puede añadir `--cuda` (~1,5 GB extra) para acelerar la transcripción. Sin ella se usa la CPU: **no hace falta GPU**.
+## Uso diario
+`start` (abrir o reutilizar), `stop` (cerrar sin dejar procesos), `restart`, `status`, `open`, `logs`, `doctor`. Ver `docs/LAUNCHING.md`.
 
-**Estado de Windows:** las adaptaciones están implementadas, pero la validación en un equipo Windows real está pendiente (ver `docs/WINDOWS-VALIDATION.md`). Si encuentras un fallo en Windows, recoge `doctor` y `logs` y explícalo con claridad; no declares que funciona si no lo has comprobado.
+## Actualizar
+Sigue `docs/UPDATING.md`: `stop` → `git pull --ff-only` → `install --yes --no-model`. Nunca borres la carpeta de la aplicación, la de proyectos ni las credenciales.
 
-## Después de instalar
-1. El panel se abre en `http://127.0.0.1:8775` (u otro puerto libre si ese está ocupado) con el asistente de **primera configuración**: carpeta de proyectos, comprobaciones del equipo y clave de Claude (opcional).
-2. Para volver a abrirlo: acceso directo o `start`. Si ya está abierto, `start` solo abre otra pestaña.
-3. Si el navegador muestra «Abre Video Studio AI desde su lanzador», ejecuta `start` (o `open`): el panel necesita el token de sesión que entrega el lanzador.
-
-## Más información
-- Instalación detallada: `docs/INSTALL-macOS.md`, `docs/INSTALL-Windows.md`, `docs/REQUIREMENTS.md`.
-- Uso diario: `docs/LAUNCHING.md` · primera configuración: `docs/FIRST-RUN.md` · Claude: `docs/CLAUDE.md`.
-- Problemas: `docs/TROUBLESHOOTING.md`.
+## Qué funciona sin clave de Claude
+Importar, transcribir en local, revisar la transcripción, subtítulos y su estilo, presets, ajustes de audio y exportar. El **plan de edición** y las **animaciones dirigidas por Claude** necesitan la clave de API de la persona (se factura en su cuenta de Anthropic; **no** está incluida en Claude Pro ni Max). Detalles: `docs/CLAUDE.md`.
 
 ## Desarrollo
-`./videostudio check` (lint, tipos, pruebas, compilación) · `cd frontend && npm run e2e` · `git config core.hooksPath .githooks` (comprobación de privacidad antes de cada commit). Arquitectura en `docs/ARCHITECTURE.md`.
+`./videostudio check` (lint, tipos, pruebas, compilación) · `cd frontend && npm run e2e` · `backend/.venv/bin/python scripts/smoke_e2e.py` · `git config core.hooksPath .githooks` (comprobación de privacidad antes de cada commit). Arquitectura: `docs/ARCHITECTURE.md`.

@@ -161,9 +161,18 @@ export function PlanPanel({
       </Button>
       {!analyzed && <p className="text-xs text-warning">Primero analiza el video: la planificación usa la transcripción, las escenas y los fotogramas.</p>}
       {notReady && (
-        <p className="text-xs text-warning">
-          Claude no está conectado. <Link to="/settings#claude" className="underline">Revisa Ajustes → Claude</Link>.
-        </p>
+        <div className="rounded-lg bg-warning/10 px-3 py-2 text-xs leading-relaxed text-fg-muted">
+          <p className="font-medium text-warning">Claude no está conectado (opcional).</p>
+          <p className="mt-1">
+            <span className="text-fg">Disponible sin conexión:</span> importar, transcribir, revisar la transcripción, subtítulos y su estilo, presets, ajustes de audio y exportar.
+          </p>
+          <p className="mt-1">
+            <span className="text-fg">Necesita tu clave de API de Anthropic:</span> el plan de edición y las animaciones que dirige Claude. Se factura en tu cuenta de Anthropic; no está incluido en Claude Pro ni Max.{' '}
+            <Link to="/settings#claude" className="text-accent underline">
+              Configurar en Ajustes → Claude
+            </Link>
+          </p>
+        </div>
       )}
       <p className="text-[11px] leading-relaxed text-fg-faint">
         Se envían a Claude Opus 5.5 la transcripción con tiempos, los datos de escenas y rostros, tus preferencias y unos pocos fotogramas reducidos; nunca el archivo de video.

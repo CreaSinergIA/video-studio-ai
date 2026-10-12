@@ -40,4 +40,4 @@ Video Studio AI es una aplicación **local**: un servidor en tu equipo y un pane
 - **Windows:** todas las protecciones anteriores están implementadas, pero su comportamiento en Windows real está pendiente de validar.
 
 ## Informar de un problema
-Mientras el proyecto no se publique no hay canal público. Cuando se publique, se habilitará un canal privado de avisos de seguridad.
+Si encuentras una vulnerabilidad, **no abras un issue público**: usa *Security → Report a vulnerability* en https://github.com/CreaSinergIA/video-studio-ai/security (aviso privado). Para el resto de problemas, abre un issue normal.
