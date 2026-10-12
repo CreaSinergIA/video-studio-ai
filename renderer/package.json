@@ -1,0 +1,26 @@
+{
+  "name": "video-studio-ai-renderer",
+  "private": true,
+  "version": "0.4.0",
+  "description": "Motor de animaciones programáticas de Video Studio AI (Fase 4) basado en Remotion",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "studio": "remotion studio src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.534",
+    "@remotion/cli": "4.0.534",
+    "@remotion/fonts": "4.0.534",
+    "@remotion/renderer": "4.0.534",
+    "lucide": "^1.53.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534",
+    "roughjs": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}

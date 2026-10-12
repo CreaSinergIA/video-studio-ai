@@ -1,0 +1,61 @@
+# --- Dependencias y compilaciones ---
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+frontend/dist/
+renderer/dist/
+renderer/.bundle*/
+*.tsbuildinfo
+build/
+out/
+release/
+*.dmg
+*.pkg
+*.msi
+*.exe
+*.zip
+*.tar.gz
+# --- Resultados de pruebas ---
+frontend/test-results/
+frontend/playwright-report/
+coverage/
+# --- Datos de usuario, modelos y medios (nunca en el repositorio) ---
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.mp4
+*.mov
+*.m4a
+*.wav
+*.mp3
+*.aac
+*.mkv
+*.webm
+models/
+engines/
+backups/
+logs/
+*.log
+# --- Credenciales y configuración local ---
+.env
+.env.*
+*.pem
+*.key
+*.p12
+.privacy-terms.local
+# --- Sistema, IDE y agentes ---
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+.claude/
+*.swp
+*~

@@ -1,0 +1,186 @@
+/* Lenguajes de movimiento de cada estilo (muestras de la interfaz). */
+
+/* Motion Tech: precisión, easing exponencial, escaneo y trazos de conexión. */
+.vsa-tech-link {
+  stroke-dasharray: 160;
+  animation: vsa-draw 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.vsa-tech-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vsa-tech-pulse 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.vsa-tech-scan {
+  animation: vsa-scan 2.8s linear infinite;
+}
+.vsa-tech-panel {
+  animation: vsa-flicker 2.8s steps(1) infinite;
+}
+.vsa-tech-bar {
+  transform-box: fill-box;
+  transform-origin: left;
+  animation: vsa-grow 2.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+/* Minimal Motion: revelados por máscara, suaves y pausados. */
+.vsa-min-reveal {
+  animation: vsa-mask 4.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.vsa-min-line {
+  animation: vsa-line 4.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.vsa-min-dot {
+  animation: vsa-breathe 4.2s ease-in-out infinite;
+}
+
+/* Creative Explainer: trazos que se dibujan y rebotes orgánicos. */
+.vsa-cre-draw {
+  stroke-dasharray: 140;
+  animation: vsa-draw 3.4s ease-in-out infinite;
+}
+.vsa-cre-bounce {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: vsa-bounce 3.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+
+@keyframes vsa-draw {
+  0% {
+    stroke-dashoffset: 160;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes vsa-tech-pulse {
+  0%,
+  10% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  30%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes vsa-scan {
+  from {
+    transform: translateY(-12px);
+  }
+  to {
+    transform: translateY(102px);
+  }
+}
+@keyframes vsa-flicker {
+  0%,
+  8% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  12% {
+    opacity: 0.3;
+  }
+  14%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes vsa-grow {
+  0%,
+  20% {
+    transform: scaleX(0);
+  }
+  50%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes vsa-mask {
+  0%,
+  8% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 0;
+  }
+  35%,
+  80% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+  }
+}
+@keyframes vsa-line {
+  0%,
+  25% {
+    width: 0;
+  }
+  55%,
+  80% {
+    width: 70px;
+  }
+  100% {
+    width: 70px;
+    opacity: 0;
+  }
+}
+@keyframes vsa-breathe {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes vsa-bounce {
+  0%,
+  10% {
+    transform: translateY(18px) scale(0.6);
+    opacity: 0;
+  }
+  30%,
+  85% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+}
+
+/* Animaciones de la muestra de subtítulos */
+.vsa-sub-pop {
+  animation: vsa-sub-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.vsa-sub-fade {
+  animation: vsa-sub-fade 0.5s ease both;
+}
+.vsa-sub-slide {
+  animation: vsa-sub-slide 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes vsa-sub-pop {
+  from {
+    transform: scale(0.75);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes vsa-sub-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vsa-sub-slide {
+  from {
+    opacity: 0;
+    transform: translateY(40%);
+  }
+}
